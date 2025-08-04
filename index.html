@@ -71,7 +71,7 @@
 
     <div class="container mx-auto p-4 sm:p-6 lg:p-8 max-w-7xl">
         <header class="text-center mb-6">
-            <h1 class="text-3xl sm:text-4xl font-bold text-gray-900">AI Book Tracker v.05</h1>
+            <h1 class="text-3xl sm:text-4xl font-bold text-gray-900">AI Book Tracker v0.6</h1>
             <p class="text-md text-gray-600 mt-2">Your personal reading history from 2014 to present.</p>
         </header>
 
@@ -206,6 +206,17 @@
         let db, auth, userId;
         let unsubscribeFromFirestore; // To detach listener when changing years
         let sortableInstance = null; // To hold the SortableJS instance
+        
+        // Your web app's Firebase configuration - PASTED FROM YOUR FIREBASE PROJECT
+        const firebaseConfig = {
+            apiKey: "AIzaSyCP1bHz8yFWHgFRrMKlmRY3BcC8JDVorR8",
+            authDomain: "book-tracker-4987d.firebaseapp.com",
+            projectId: "book-tracker-4987d",
+            storageBucket: "book-tracker-4987d.appspot.com",
+            messagingSenderId: "236216243093",
+            appId: "1:236216243093:web:a65bbddebb01fd5182dc9c"
+        };
+
 
         // --- DOM ELEMENTS ---
         const yearTabsContainer = document.getElementById('year-tabs');
@@ -226,16 +237,6 @@
 
         // --- FIREBASE SETUP ---
         async function initializeFirebase() {
-            // Your web app's Firebase configuration - PASTED FROM YOUR FIREBASE PROJECT
-            const firebaseConfig = {
-                apiKey: "AIzaSyCP1bHz8yFWHgFRrMKlmRY3BcC8JDVorR8",
-                authDomain: "book-tracker-4987d.firebaseapp.com",
-                projectId: "book-tracker-4987d",
-                storageBucket: "book-tracker-4987d.appspot.com",
-                messagingSenderId: "236216243093",
-                appId: "1:236216243093:web:a65bbddebb01fd5182dc9c"
-            };
-
             try {
                 const app = initializeApp(firebaseConfig);
                 db = getFirestore(app);
@@ -493,7 +494,8 @@
                 }
             };
             
-            const apiKey = ""; // This will be provided by the environment when calling the Gemini API
+            // **FIX**: Use the API key from your firebaseConfig object
+            const apiKey = firebaseConfig.apiKey; 
             const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
 
             const response = await fetch(apiUrl, {
@@ -503,8 +505,8 @@
             });
 
             if (!response.ok) {
-                const errorBody = await response.text();
-                throw new Error(`API request failed with status ${response.status}: ${errorBody}`);
+                const errorBody = await response.json(); // Use .json() to get the detailed error
+                throw new Error(`API request failed with status ${response.status}: ${errorBody.error.message}`);
             }
 
             const result = await response.json();
