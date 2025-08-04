@@ -71,7 +71,7 @@
 
     <div class="container mx-auto p-4 sm:p-6 lg:p-8 max-w-7xl">
         <header class="text-center mb-6">
-            <h1 class="text-3xl sm:text-4xl font-bold text-gray-900">AI Book Tracker v0.4</h1>
+            <h1 class="text-3xl sm:text-4xl font-bold text-gray-900">AI Book Tracker v.05</h1>
             <p class="text-md text-gray-600 mt-2">Your personal reading history from 2014 to present.</p>
         </header>
 
@@ -88,7 +88,7 @@
             <!-- Form to add a new book -->
             <div class="mb-6 pb-6 border-b border-gray-200">
                 <h2 class="text-xl font-semibold mb-3">Add a New Book to <span id="current-year-label"></span></h2>
-                <form id="add-book-form" class="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+                <form id="add-book-form" class="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
                     <div class="md:col-span-1">
                         <label for="book-title" class="block text-sm font-medium text-gray-700">Book Title</label>
                         <input type="text" id="book-title" name="book-title" required class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
@@ -96,6 +96,24 @@
                     <div class="md:col-span-1">
                         <label for="book-author" class="block text-sm font-medium text-gray-700">Author</label>
                         <input type="text" id="book-author" name="book-author" required class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                    </div>
+                    <div class="md:col-span-1">
+                        <label for="book-month" class="block text-sm font-medium text-gray-700">Month Read</label>
+                        <select id="book-month" name="book-month" required class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                            <option value="">Select Month</option>
+                            <option value="January">January</option>
+                            <option value="February">February</option>
+                            <option value="March">March</option>
+                            <option value="April">April</option>
+                            <option value="May">May</option>
+                            <option value="June">June</option>
+                            <option value="July">July</option>
+                            <option value="August">August</option>
+                            <option value="September">September</option>
+                            <option value="October">October</option>
+                            <option value="November">November</option>
+                            <option value="December">December</option>
+                        </select>
                     </div>
                     <div class="md:col-span-1">
                         <button type="submit" id="add-book-btn" class="w-full inline-flex justify-center items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
@@ -118,6 +136,7 @@
                                 <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cover</th>
                                 <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Title</th>
                                 <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Author</th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Month Read</th>
                                 <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Published Year</th>
                                 <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                             </tr>
@@ -194,6 +213,7 @@
         const addBookForm = document.getElementById('add-book-form');
         const titleInput = document.getElementById('book-title');
         const authorInput = document.getElementById('book-author');
+        const monthInput = document.getElementById('book-month'); // New element
         const addBookBtn = document.getElementById('add-book-btn');
         const loader = document.getElementById('loader');
         const btnText = document.getElementById('btn-text');
@@ -317,6 +337,9 @@
                             <div class="text-sm text-gray-500">${book.author}</div>
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap">
+                            <div class="text-sm text-gray-500">${book.monthRead || 'N/A'}</div>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
                             <div class="text-sm text-gray-500">${book.publicationYear || 'N/A'}</div>
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
@@ -360,9 +383,10 @@
             e.preventDefault();
             const title = titleInput.value.trim();
             const author = authorInput.value.trim();
+            const monthRead = monthInput.value; // Get month value
 
-            if (!title || !author) {
-                showError("Please enter both a title and an author.");
+            if (!title || !author || !monthRead) { // Add month validation
+                showError("Please fill out all fields, including the month.");
                 return;
             }
 
@@ -375,6 +399,7 @@
                 await addDoc(booksCollectionRef, {
                     title: title,
                     author: author,
+                    monthRead: monthRead, // Save month to Firestore
                     yearRead: currentYear,
                     publicationYear: bookData.publicationYear || 'Unknown',
                     coverImageUrl: bookData.coverImageUrl || '',
