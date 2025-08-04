@@ -65,13 +65,32 @@
             background: #eef2ff;
             opacity: 0.7;
         }
+        /* Styles for author suggestions dropdown */
+        .author-suggestions {
+            position: absolute;
+            background-color: white;
+            border: 1px solid #d1d5db;
+            border-top: none;
+            border-radius: 0 0 0.375rem 0.375rem;
+            width: 100%;
+            max-height: 150px;
+            overflow-y: auto;
+            z-index: 10;
+        }
+        .suggestion-item {
+            padding: 0.5rem 0.75rem;
+            cursor: pointer;
+        }
+        .suggestion-item:hover {
+            background-color: #eef2ff;
+        }
     </style>
 </head>
 <body class="bg-gray-100 text-gray-800">
 
     <div class="container mx-auto p-4 sm:p-6 lg:p-8 max-w-7xl">
         <header class="text-center mb-6">
-            <h1 class="text-3xl sm:text-4xl font-bold text-gray-900">AI Book Tracker v0.6</h1>
+            <h1 class="text-3xl sm:text-4xl font-bold text-gray-900">AI Book Tracker v0.7</h1>
             <p class="text-md text-gray-600 mt-2">Your personal reading history from 2014 to present.</p>
         </header>
 
@@ -93,9 +112,10 @@
                         <label for="book-title" class="block text-sm font-medium text-gray-700">Book Title</label>
                         <input type="text" id="book-title" name="book-title" required class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
                     </div>
-                    <div class="md:col-span-1">
+                    <div class="md:col-span-1 relative">
                         <label for="book-author" class="block text-sm font-medium text-gray-700">Author</label>
-                        <input type="text" id="book-author" name="book-author" required class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                        <input type="text" id="book-author" name="book-author" autocomplete="off" required class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                        <div id="author-suggestions-container" class="author-suggestions hidden"></div>
                     </div>
                     <div class="md:col-span-1">
                         <label for="book-month" class="block text-sm font-medium text-gray-700">Month Read</label>
@@ -204,10 +224,12 @@
         // --- GLOBAL STATE & CONFIG ---
         let currentYear = new Date().getFullYear();
         let db, auth, userId;
-        let unsubscribeFromFirestore; // To detach listener when changing years
-        let sortableInstance = null; // To hold the SortableJS instance
-        
-        // Your web app's Firebase configuration - PASTED FROM YOUR FIREBASE PROJECT
+        let unsubscribeFromFirestore; 
+        let sortableInstance = null; 
+        let authorSuggestions = [];
+        let titleBlurTimeout;
+
+        // Your web app's Firebase configuration
         const firebaseConfig = {
             apiKey: "AIzaSyCP1bHz8yFWHgFRrMKlmRY3BcC8JDVorR8",
             authDomain: "book-tracker-4987d.firebaseapp.com",
@@ -224,7 +246,8 @@
         const addBookForm = document.getElementById('add-book-form');
         const titleInput = document.getElementById('book-title');
         const authorInput = document.getElementById('book-author');
-        const monthInput = document.getElementById('book-month'); // New element
+        const authorSuggestionsContainer = document.getElementById('author-suggestions-container');
+        const monthInput = document.getElementById('book-month');
         const addBookBtn = document.getElementById('add-book-btn');
         const loader = document.getElementById('loader');
         const btnText = document.getElementById('btn-text');
@@ -245,12 +268,10 @@
 
                 onAuthStateChanged(auth, async (user) => {
                     if (user) {
-                        // User is signed in.
                         userId = user.uid;
                         document.getElementById('user-id-display').textContent = userId;
                         initializeAppUI();
                     } else {
-                        // User is signed out. Sign in anonymously.
                         try {
                             await signInAnonymously(auth);
                         } catch (error) {
@@ -271,6 +292,16 @@
             setupTabs();
             updateActiveTab();
             addBookForm.addEventListener('submit', handleAddBook);
+            
+            // Event listeners for author suggestions
+            titleInput.addEventListener('blur', handleTitleBlur);
+            authorInput.addEventListener('input', handleAuthorInput);
+            authorInput.addEventListener('focus', () => showSuggestions(authorSuggestions));
+            document.addEventListener('click', (e) => {
+                if (!authorInput.contains(e.target) && !authorSuggestionsContainer.contains(e.target)) {
+                    authorSuggestionsContainer.classList.add('hidden');
+                }
+            });
         }
 
         function setupTabs() {
@@ -384,9 +415,9 @@
             e.preventDefault();
             const title = titleInput.value.trim();
             const author = authorInput.value.trim();
-            const monthRead = monthInput.value; // Get month value
+            const monthRead = monthInput.value; 
 
-            if (!title || !author || !monthRead) { // Add month validation
+            if (!title || !author || !monthRead) {
                 showError("Please fill out all fields, including the month.");
                 return;
             }
@@ -400,7 +431,7 @@
                 await addDoc(booksCollectionRef, {
                     title: title,
                     author: author,
-                    monthRead: monthRead, // Save month to Firestore
+                    monthRead: monthRead, 
                     yearRead: currentYear,
                     publicationYear: bookData.publicationYear || 'Unknown',
                     coverImageUrl: bookData.coverImageUrl || '',
@@ -409,6 +440,7 @@
                 });
 
                 addBookForm.reset();
+                authorSuggestions = []; // Clear suggestions
                 hideError();
 
             } catch (error) {
@@ -475,7 +507,92 @@
             }
         }
 
+        // --- AUTHOR SUGGESTION LOGIC ---
+        function handleTitleBlur() {
+            const title = titleInput.value.trim();
+            if (title) {
+                fetchAuthorSuggestions(title);
+            }
+        }
+
+        function handleAuthorInput() {
+            const filterText = authorInput.value.toLowerCase();
+            const filteredSuggestions = authorSuggestions.filter(author => 
+                author.toLowerCase().includes(filterText)
+            );
+            showSuggestions(filteredSuggestions);
+        }
+
+        function showSuggestions(suggestions) {
+            authorSuggestionsContainer.innerHTML = '';
+            if (suggestions.length > 0) {
+                authorSuggestionsContainer.classList.remove('hidden');
+                suggestions.forEach(author => {
+                    const div = document.createElement('div');
+                    div.textContent = author;
+                    div.className = 'suggestion-item';
+                    div.onclick = () => {
+                        authorInput.value = author;
+                        authorSuggestionsContainer.classList.add('hidden');
+                    };
+                    authorSuggestionsContainer.appendChild(div);
+                });
+            } else {
+                authorSuggestionsContainer.classList.add('hidden');
+            }
+        }
+
+
         // --- AI (GEMINI) LOGIC ---
+        async function fetchAuthorSuggestions(title) {
+            const prompt = `Provide a list of authors who have written a book titled "${title}". Return only a JSON array of strings, like ["Author One", "Author Two"]. If you can't find any, return an empty array.`;
+            
+            const payload = {
+                contents: [{ role: "user", parts: [{ text: prompt }] }],
+                generationConfig: {
+                    responseMimeType: "application/json",
+                    responseSchema: {
+                        type: "OBJECT",
+                        properties: {
+                            authors: {
+                                type: "ARRAY",
+                                items: { type: "STRING" }
+                            }
+                        },
+                        required: ["authors"]
+                    }
+                }
+            };
+
+            try {
+                const apiKey = firebaseConfig.apiKey; 
+                const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                if (!response.ok) {
+                    const errorBody = await response.json();
+                    throw new Error(`Author suggestion API failed: ${errorBody.error.message}`);
+                }
+
+                const result = await response.json();
+                if (result.candidates && result.candidates[0].content && result.candidates[0].content.parts.length > 0) {
+                    const parsedResult = JSON.parse(result.candidates[0].content.parts[0].text);
+                    authorSuggestions = parsedResult.authors || [];
+                    showSuggestions(authorSuggestions);
+                } else {
+                    authorSuggestions = [];
+                }
+            } catch (error) {
+                console.error(error);
+                authorSuggestions = [];
+            }
+        }
+
+
         async function fetchBookData(title, author) {
             const prompt = `Given the book title "${title}" and author "${author}", find the original publication year and a URL for the book cover image.`;
             
@@ -494,7 +611,6 @@
                 }
             };
             
-            // **FIX**: Use the API key from your firebaseConfig object
             const apiKey = firebaseConfig.apiKey; 
             const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
 
@@ -505,7 +621,7 @@
             });
 
             if (!response.ok) {
-                const errorBody = await response.json(); // Use .json() to get the detailed error
+                const errorBody = await response.json();
                 throw new Error(`API request failed with status ${response.status}: ${errorBody.error.message}`);
             }
 
