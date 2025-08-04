@@ -63,6 +63,28 @@
             background: #eef2ff;
             opacity: 0.7;
         }
+        .suggestions-container {
+            position: absolute;
+            background-color: white;
+            border: 1px solid #d1d5db;
+            border-top: none;
+            border-radius: 0 0 0.375rem 0.375rem;
+            width: 100%;
+            max-height: 200px;
+            overflow-y: auto;
+            z-index: 10;
+        }
+        .suggestion-item {
+            padding: 0.5rem 0.75rem;
+            cursor: pointer;
+            border-bottom: 1px solid #e5e7eb;
+        }
+        .suggestion-item:last-child {
+            border-bottom: none;
+        }
+        .suggestion-item:hover {
+            background-color: #eef2ff;
+        }
         .stats-modal {
             display: none;
             position: fixed;
@@ -80,7 +102,7 @@
 
     <div class="container mx-auto p-4 sm:p-6 lg:p-8 max-w-7xl">
         <header class="text-center mb-6">
-            <h1 class="text-3xl sm:text-4xl font-bold text-gray-900">AI Book Tracker v1.2</h1>
+            <h1 class="text-3xl sm:text-4xl font-bold text-gray-900">AI Book Tracker v1.4</h1>
             <p class="text-md text-gray-600 mt-2">Your personal reading history from 2014 to present.</p>
         </header>
 
@@ -148,7 +170,7 @@
     <!-- Stats Modal -->
     <div id="stats-modal" class="stats-modal">
         <div class="bg-white rounded-lg shadow-xl m-4 sm:m-8 max-w-4xl w-full mx-auto my-auto p-6 relative">
-             <button id="close-stats-modal" class="absolute top-4 right-4 text-gray-500 hover:text-gray-800">&times;</button>
+             <button id="close-stats-modal" class="absolute top-4 right-4 text-gray-500 hover:text-gray-800 text-3xl font-bold">&times;</button>
              <h2 class="text-2xl font-bold mb-4">Reading Statistics</h2>
              <div class="mb-4">
                 <div class="inline-flex rounded-md shadow-sm">
@@ -195,7 +217,6 @@
         let db, auth, userId;
         let unsubscribeFromFirestore; 
         let sortableInstance = null; 
-        let rowSuggestions = new Map();
         let fictionChart, genreChart;
         
         const firebaseConfig = {
@@ -275,12 +296,12 @@
             row.innerHTML = `
                 <div class="md:col-span-4 relative">
                     <label class="block text-sm font-medium text-gray-700">Book Title</label>
-                    <input type="text" required class="mt-1 bulk-title w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                    <input type="text" required class="mt-1 bulk-title w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" autocomplete="off">
+                    <div class="title-suggestions suggestions-container hidden"></div>
                 </div>
                 <div class="md:col-span-3 relative">
                     <label class="block text-sm font-medium text-gray-700">Author</label>
                     <input type="text" required class="mt-1 bulk-author w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" autocomplete="off">
-                    <div class="author-suggestions hidden"></div>
                 </div>
                 <div class="md:col-span-2">
                     <label class="block text-sm font-medium text-gray-700">Month Read</label>
@@ -309,11 +330,7 @@
             bulkBookRows.appendChild(row);
 
             const titleInput = row.querySelector('.bulk-title');
-            const authorInput = row.querySelector('.bulk-author');
-
-            titleInput.addEventListener('blur', () => handleTitleBlur(row));
-            authorInput.addEventListener('input', () => handleAuthorInput(row));
-            authorInput.addEventListener('focus', () => handleAuthorInput(row));
+            titleInput.addEventListener('input', debounce((e) => handleTitleInput(e.target.closest('.grid')), 500));
         }
 
         function setupTabs() {
@@ -404,20 +421,14 @@
         }
 
         function fetchAndRenderBooks() {
-            if (unsubscribeFromFirestore) {
-                unsubscribeFromFirestore();
-            }
-
+            if (unsubscribeFromFirestore) unsubscribeFromFirestore();
             if (!db || !userId) return;
             
             const booksCollectionRef = collection(db, `users/${userId}/books`);
             const q = query(booksCollectionRef, where("yearRead", "==", currentYear), orderBy("order", "asc"));
 
             unsubscribeFromFirestore = onSnapshot(q, (querySnapshot) => {
-                const books = [];
-                querySnapshot.forEach((doc) => {
-                    books.push({ id: doc.id, ...doc.data() });
-                });
+                const books = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
                 renderBooks(books);
             }, (error) => {
                 console.error("Error fetching books:", error);
@@ -443,20 +454,21 @@
                 const title = row.querySelector('.bulk-title').value.trim();
                 const author = row.querySelector('.bulk-author').value.trim();
                 const monthRead = row.querySelector('.bulk-month').value;
+                const publicationYear = row.dataset.publicationYear || 'N/A';
 
                 if (title && author && monthRead) {
                     try {
                         const bookData = await fetchBookDataWithRetry(title, author);
                         booksToAdd.push({
                             title, author, monthRead, yearRead: currentYear,
-                            publicationYear: bookData.publicationYear || 'N/A',
+                            publicationYear: publicationYear, // Use year from suggestion
                             fictionStatus: bookData.fictionStatus || 'N/A',
                             genre: bookData.genre || 'N/A',
                             createdAt: new Date()
                         });
                     } catch (error) {
                         console.error(`Failed to fetch data for ${title}:`, error);
-                        booksToAdd.push({ title, author, monthRead, yearRead: currentYear });
+                        booksToAdd.push({ title, author, monthRead, yearRead: currentYear, publicationYear });
                     }
                 }
                 processedCount++;
@@ -486,7 +498,6 @@
         }
 
         async function handleDeleteBook(bookId) {
-            // This is a placeholder for a custom modal confirmation
             if (confirm('Are you sure you want to delete this book?')) {
                  try {
                     await deleteDoc(doc(db, `users/${userId}/books`, bookId));
@@ -518,10 +529,9 @@
             }
         }
 
-        // --- STATS LOGIC ---
         async function openStatsModal() {
             statsModal.style.display = 'flex';
-            generateStats('year'); // Default to this year's stats
+            generateStats('year');
         }
 
         async function generateStats(scope) {
@@ -529,116 +539,88 @@
             statsAllBtn.classList.toggle('bg-gray-100', scope !== 'all');
 
             const booksCollectionRef = collection(db, `users/${userId}/books`);
-            let q;
-            if (scope === 'year') {
-                q = query(booksCollectionRef, where("yearRead", "==", currentYear));
-            } else {
-                q = query(booksCollectionRef);
-            }
-
+            const q = scope === 'year' ? query(booksCollectionRef, where("yearRead", "==", currentYear)) : query(booksCollectionRef);
             const querySnapshot = await getDocs(q);
-            const books = [];
-            querySnapshot.forEach(doc => books.push(doc.data()));
+            const books = querySnapshot.docs.map(doc => doc.data());
 
-            // Calculate stats
             const totalBooks = books.length;
             const authors = books.map(b => b.author);
             const uniqueAuthors = new Set(authors).size;
             
-            const authorCounts = authors.reduce((acc, author) => {
-                acc[author] = (acc[author] || 0) + 1;
-                return acc;
-            }, {});
+            const authorCounts = authors.reduce((acc, author) => ({...acc, [author]: (acc[author] || 0) + 1}), {});
             const topAuthor = Object.keys(authorCounts).reduce((a, b) => authorCounts[a] > authorCounts[b] ? a : b, 'N/A');
 
-            const fictionCounts = books.reduce((acc, book) => {
-                const status = book.fictionStatus || 'Unknown';
-                acc[status] = (acc[status] || 0) + 1;
-                return acc;
-            }, {});
-
-            const genreCounts = books.reduce((acc, book) => {
-                const genre = book.genre || 'Unknown';
-                acc[genre] = (acc[genre] || 0) + 1;
-                return acc;
-            }, {});
+            const fictionCounts = books.reduce((acc, book) => ({...acc, [book.fictionStatus || 'Unknown']: (acc[book.fictionStatus || 'Unknown'] || 0) + 1}), {});
+            const genreCounts = books.reduce((acc, book) => ({...acc, [book.genre || 'Unknown']: (acc[book.genre || 'Unknown'] || 0) + 1}), {});
             const sortedGenres = Object.entries(genreCounts).sort(([,a],[,b]) => b-a).slice(0, 5);
 
-
-            // Update DOM
             document.getElementById('stats-total-books').textContent = totalBooks;
             document.getElementById('stats-unique-authors').textContent = uniqueAuthors;
             document.getElementById('stats-top-author').textContent = topAuthor;
 
-            // Update Charts
             updateChart(fictionChart, 'fiction-chart', 'pie', Object.keys(fictionCounts), Object.values(fictionCounts), 'Fiction vs Non-Fiction');
             updateChart(genreChart, 'genre-chart', 'bar', sortedGenres.map(g => g[0]), sortedGenres.map(g => g[1]), 'Top 5 Genres');
         }
 
         function updateChart(chartInstance, canvasId, type, labels, data, title) {
             const ctx = document.getElementById(canvasId).getContext('2d');
-            if (chartInstance) {
-                chartInstance.destroy();
-            }
-            chartInstance = new Chart(ctx, {
+            if (chartInstance) chartInstance.destroy();
+            
+            const chartConfig = {
                 type: type,
                 data: {
                     labels: labels,
                     datasets: [{
                         label: title,
                         data: data,
-                        backgroundColor: ['#4f46e5', '#818cf8', '#a5b4fc', '#c7d2fe', '#e0e7ff'],
+                        backgroundColor: ['#4f46e5', '#818cf8', '#a5b4fc', '#c7d2fe', '#e0e7ff', '#6366f1', '#a78bfa'],
                         borderColor: '#ffffff',
                         borderWidth: 1
                     }]
                 },
-                options: {
-                    responsive: true,
-                    plugins: { legend: { position: 'top' } }
-                }
-            });
-            if (type === 'pie') fictionChart = chartInstance;
-            if (type === 'bar') genreChart = chartInstance;
+                options: { responsive: true, plugins: { legend: { position: 'top' } } }
+            };
+
+            if (type === 'pie') fictionChart = new Chart(ctx, chartConfig);
+            if (type === 'bar') genreChart = new Chart(ctx, chartConfig);
         }
 
-
-        async function handleTitleBlur(row) {
+        async function handleTitleInput(row) {
             const titleInput = row.querySelector('.bulk-title');
+            const suggestionsContainer = row.querySelector('.title-suggestions');
             const title = titleInput.value.trim();
-            if (title) {
-                const suggestions = await fetchAuthorSuggestions(title);
-                rowSuggestions.set(row.id, suggestions);
-                handleAuthorInput(row);
+            
+            if (title.length < 3) {
+                suggestionsContainer.classList.add('hidden');
+                return;
             }
+            
+            const suggestions = await fetchBookSuggestions(title);
+            showTitleSuggestions(suggestions, row);
         }
 
-        function handleAuthorInput(row) {
+        function showTitleSuggestions(suggestions, row) {
+            const suggestionsContainer = row.querySelector('.title-suggestions');
+            const titleInput = row.querySelector('.bulk-title');
             const authorInput = row.querySelector('.bulk-author');
-            const suggestionsContainer = row.querySelector('.author-suggestions');
-            const suggestions = rowSuggestions.get(row.id) || [];
-            const filterText = authorInput.value.toLowerCase();
-            const filteredSuggestions = suggestions.filter(author => 
-                author.toLowerCase().includes(filterText)
-            );
-            showSuggestions(filteredSuggestions, authorInput, suggestionsContainer);
-        }
-
-        function showSuggestions(suggestions, authorInput, suggestionsContainer) {
             suggestionsContainer.innerHTML = '';
+
             if (suggestions.length > 0) {
                 suggestionsContainer.classList.remove('hidden');
-                suggestions.forEach(author => {
+                suggestions.forEach(book => {
                     const div = document.createElement('div');
-                    div.textContent = author;
                     div.className = 'suggestion-item';
+                    div.innerHTML = `<p class="font-semibold">${book.title}</p><p class="text-sm text-gray-600">${book.author} (${book.publicationYear})</p>`;
                     div.onmousedown = () => {
-                        authorInput.value = author;
+                        titleInput.value = book.title;
+                        authorInput.value = book.author;
+                        row.dataset.publicationYear = book.publicationYear;
                         suggestionsContainer.classList.add('hidden');
                     };
                     suggestionsContainer.appendChild(div);
                 });
                  document.addEventListener('click', (e) => {
-                    if (!authorInput.parentElement.contains(e.target)) {
+                    if (!titleInput.parentElement.contains(e.target)) {
                        suggestionsContainer.classList.add('hidden');
                     }
                 }, { once: true });
@@ -647,39 +629,36 @@
             }
         }
 
-        async function fetchAuthorSuggestions(title) {
-            const prompt = `Provide a list of authors who have written a book titled "${title}". Return only a JSON array of strings, like ["Author One", "Author Two"]. If you can't find any, return an empty array.`;
-            
+        async function fetchBookSuggestions(searchTerm) {
+             const prompt = `Find books matching the search term "${searchTerm}". Return a JSON array of up to 5 objects, each with "title", "author", and "publicationYear" keys.`;
             const payload = {
                 contents: [{ role: "user", parts: [{ text: prompt }] }],
                 generationConfig: {
                     responseMimeType: "application/json",
                     responseSchema: {
                         type: "OBJECT",
-                        properties: { authors: { type: "ARRAY", items: { type: "STRING" } } },
-                        required: ["authors"]
+                        properties: { books: { type: "ARRAY", items: { 
+                            type: "OBJECT",
+                            properties: {
+                                title: { type: "STRING" },
+                                author: { type: "STRING" },
+                                publicationYear: { type: "STRING" }
+                            },
+                            required: ["title", "author", "publicationYear"]
+                        } } },
+                        required: ["books"]
                     }
                 }
             };
-
             try {
                 const apiKey = firebaseConfig.apiKey; 
                 const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
-                const response = await fetch(apiUrl, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
-                });
-
-                if (!response.ok) {
-                    const errorBody = await response.json();
-                    throw new Error(`Author suggestion API failed: ${errorBody.error.message}`);
-                }
-
+                const response = await fetch(apiUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+                if (!response.ok) throw new Error(`Book suggestion API failed: ${response.statusText}`);
                 const result = await response.json();
-                if (result.candidates && result.candidates[0].content && result.candidates[0].content.parts.length > 0) {
+                if (result.candidates?.[0]?.content?.parts?.[0]) {
                     const parsedResult = JSON.parse(result.candidates[0].content.parts[0].text);
-                    return parsedResult.authors || [];
+                    return parsedResult.books || [];
                 }
                 return [];
             } catch (error) {
@@ -689,46 +668,27 @@
         }
 
         async function fetchBookData(title, author) {
-            const prompt = `For the book "${title}" by "${author}", provide its original publication year, whether it is "Fiction" or "Non-Fiction", and its primary genre. If you cannot find a confident match, return "N/A" for the unknown fields.`;
-            
+            const prompt = `For the book "${title}" by "${author}", provide whether it is "Fiction" or "Non-Fiction", and its primary genre. If you cannot find a confident match, return "N/A" for the unknown fields.`;
             const payload = {
                 contents: [{ role: "user", parts: [{ text: prompt }] }],
                 generationConfig: {
                     responseMimeType: "application/json",
                     responseSchema: {
                         type: "OBJECT",
-                        properties: {
-                            publicationYear: { type: "STRING" },
-                            fictionStatus: { type: "STRING" },
-                            genre: { type: "STRING" }
-                        },
-                        required: ["publicationYear", "fictionStatus", "genre"]
+                        properties: { fictionStatus: { type: "STRING" }, genre: { type: "STRING" } },
+                        required: ["fictionStatus", "genre"]
                     }
                 }
             };
-            
             const apiKey = firebaseConfig.apiKey; 
             const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
-
-            const response = await fetch(apiUrl, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
-            });
-
-            if (!response.ok) {
-                const errorBody = await response.json();
-                throw new Error(`API request failed with status ${response.status}: ${errorBody.error.message}`);
-            }
-
+            const response = await fetch(apiUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+            if (!response.ok) throw new Error(`API request failed: ${response.statusText}`);
             const result = await response.json();
-
-            if (result.candidates && result.candidates[0].content && result.candidates[0].content.parts.length > 0) {
-                const text = result.candidates[0].content.parts[0].text;
-                return JSON.parse(text);
-            } else {
-                return { publicationYear: 'N/A', fictionStatus: 'N/A', genre: 'N/A' };
+            if (result.candidates?.[0]?.content?.parts?.[0]) {
+                return JSON.parse(result.candidates[0].content.parts[0].text);
             }
+            return { fictionStatus: 'N/A', genre: 'N/A' };
         }
 
         async function fetchBookDataWithRetry(title, author, retries = 3, delay = 1000) {
@@ -737,24 +697,24 @@
                     return await fetchBookData(title, author);
                 } catch (error) {
                     if (i === retries - 1) throw error;
-                    console.log(`Retrying API call for ${title} (${i + 1}/${retries})...`);
                     await new Promise(res => setTimeout(res, delay * Math.pow(2, i)));
                 }
             }
         }
+        
+        const debounce = (func, delay) => {
+            let timeout;
+            return (...args) => {
+                clearTimeout(timeout);
+                timeout = setTimeout(() => func.apply(this, args), delay);
+            };
+        };
 
         function setBulkLoading(isLoading) {
-            if (isLoading) {
-                addAllBtn.disabled = true;
-                bulkLoader.classList.remove('hidden');
-                addAllBtnText.classList.add('hidden');
-                bulkProgressContainer.classList.remove('hidden');
-            } else {
-                addAllBtn.disabled = false;
-                bulkLoader.classList.add('hidden');
-                addAllBtnText.classList.remove('hidden');
-                setTimeout(() => bulkProgressContainer.classList.add('hidden'), 2000);
-            }
+            addAllBtn.disabled = isLoading;
+            bulkLoader.classList.toggle('hidden', !isLoading);
+            addAllBtnText.classList.toggle('hidden', isLoading);
+            bulkProgressContainer.classList.toggle('hidden', !isLoading);
         }
 
         function updateBulkProgress(current, total) {
