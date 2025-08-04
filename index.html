@@ -179,7 +179,7 @@
     <script type="module">
         // Firebase Imports
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, addDoc, onSnapshot, query, where, doc, deleteDoc, setLogLevel, orderBy, writeBatch, updateDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // --- GLOBAL STATE & CONFIG ---
@@ -206,15 +206,15 @@
 
         // --- FIREBASE SETUP ---
         async function initializeFirebase() {
-            const appId = typeof __app_id !== 'undefined' ? __app_id : 'book-tracker-ai';
-            const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
-            const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
-
-            if (!firebaseConfig) {
-                console.error("Firebase config is not available.");
-                showError("Application is not configured correctly. Cannot connect to the database.");
-                return;
-            }
+            // Your web app's Firebase configuration - PASTED FROM YOUR FIREBASE PROJECT
+            const firebaseConfig = {
+                apiKey: "AIzaSyCP1bHz8yFWHgFRrMKlmRY3BcC8JDVorR8",
+                authDomain: "book-tracker-4987d.firebaseapp.com",
+                projectId: "book-tracker-4987d",
+                storageBucket: "book-tracker-4987d.appspot.com",
+                messagingSenderId: "236216243093",
+                appId: "1:236216243093:web:a65bbddebb01fd5182dc9c"
+            };
 
             try {
                 const app = initializeApp(firebaseConfig);
@@ -224,16 +224,14 @@
 
                 onAuthStateChanged(auth, async (user) => {
                     if (user) {
+                        // User is signed in.
                         userId = user.uid;
                         document.getElementById('user-id-display').textContent = userId;
                         initializeAppUI();
                     } else {
+                        // User is signed out. Sign in anonymously.
                         try {
-                             if (initialAuthToken) {
-                                await signInWithCustomToken(auth, initialAuthToken);
-                            } else {
-                                await signInAnonymously(auth);
-                            }
+                            await signInAnonymously(auth);
                         } catch (error) {
                              console.error("Anonymous sign-in failed:", error);
                              showError("Could not establish a secure session. Please refresh the page.");
@@ -299,7 +297,6 @@
 
                 books.forEach(book => {
                     const row = document.createElement('tr');
-                    // Use book.id for the row's ID attribute for easy lookup
                     row.id = book.id; 
                     row.innerHTML = `
                         <td class="px-2 py-4 whitespace-nowrap text-gray-400 text-center drag-handle">
@@ -333,7 +330,6 @@
                     button.addEventListener('click', handleDeleteBook);
                 });
             }
-            // Initialize or re-initialize sortable functionality
             initializeSortable();
         }
 
@@ -345,9 +341,7 @@
 
             if (!db || !userId) return;
             
-            const appId = typeof __app_id !== 'undefined' ? __app_id : 'book-tracker-ai';
-            const booksCollectionRef = collection(db, `artifacts/${appId}/users/${userId}/books`);
-            // Query books for the current year and order them by the 'order' field
+            const booksCollectionRef = collection(db, `users/${userId}/books`);
             const q = query(booksCollectionRef, where("yearRead", "==", currentYear), orderBy("order", "asc"));
 
             unsubscribeFromFirestore = onSnapshot(q, (querySnapshot) => {
@@ -376,12 +370,8 @@
 
             try {
                 const bookData = await fetchBookDataWithRetry(title, author);
-                
-                // New books get an order value that places them at the end of the current list
                 const newOrder = bookList.children.length;
-
-                const appId = typeof __app_id !== 'undefined' ? __app_id : 'book-tracker-ai';
-                const booksCollectionRef = collection(db, `artifacts/${appId}/users/${userId}/books`);
+                const booksCollectionRef = collection(db, `users/${userId}/books`);
                 await addDoc(booksCollectionRef, {
                     title: title,
                     author: author,
@@ -389,7 +379,7 @@
                     publicationYear: bookData.publicationYear || 'Unknown',
                     coverImageUrl: bookData.coverImageUrl || '',
                     createdAt: new Date(),
-                    order: newOrder // Add the order field
+                    order: newOrder
                 });
 
                 addBookForm.reset();
@@ -419,10 +409,7 @@
 
             if (shouldDelete) {
                  try {
-                    const appId = typeof __app_id !== 'undefined' ? __app_id : 'book-tracker-ai';
-                    await deleteDoc(doc(db, `artifacts/${appId}/users/${userId}/books`, bookId));
-                    // Note: Deleting a book will leave a gap in the 'order' sequence. 
-                    // This is okay, as orderBy still works. Re-ordering after delete could be a future enhancement.
+                    await deleteDoc(doc(db, `users/${userId}/books`, bookId));
                 } catch (error) {
                     console.error("Error deleting book:", error);
                     showError("Failed to delete the book. Please try again.");
@@ -432,25 +419,24 @@
         
         function initializeSortable() {
             if (sortableInstance) {
-                sortableInstance.destroy(); // Destroy previous instance to prevent issues
+                sortableInstance.destroy();
             }
             sortableInstance = new Sortable(bookList, {
-                handle: '.drag-handle', // Specify the drag handle
-                animation: 150, // Animation speed
-                ghostClass: 'sortable-ghost', // Class for the drop placeholder
-                onEnd: updateBookOrder, // Callback after dragging ends
+                handle: '.drag-handle',
+                animation: 150,
+                ghostClass: 'sortable-ghost',
+                onEnd: updateBookOrder,
             });
         }
 
         async function updateBookOrder() {
             const batch = writeBatch(db);
             const rows = bookList.querySelectorAll('tr');
-            const appId = typeof __app_id !== 'undefined' ? __app_id : 'book-tracker-ai';
 
             rows.forEach((row, index) => {
                 const bookId = row.id;
                 if (bookId) {
-                    const bookRef = doc(db, `artifacts/${appId}/users/${userId}/books`, bookId);
+                    const bookRef = doc(db, `users/${userId}/books`, bookId);
                     batch.update(bookRef, { order: index });
                 }
             });
@@ -482,7 +468,7 @@
                 }
             };
             
-            const apiKey = ""; // Provided by the environment
+            const apiKey = ""; // This will be provided by the environment when calling the Gemini API
             const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
 
             const response = await fetch(apiUrl, {
