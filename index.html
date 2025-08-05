@@ -115,7 +115,7 @@
 
     <div class="container mx-auto p-4 sm:p-6 lg:p-8 max-w-7xl">
         <header class="text-center mb-6">
-            <h1 class="text-3xl sm:text-4xl font-bold text-gray-900">AI Book Tracker v1.6</h1>
+            <h1 class="text-3xl sm:text-4xl font-bold text-gray-900">AI Book Tracker v1.7</h1>
             <p class="text-md text-gray-600 mt-2">Your personal reading history from 2014 to present.</p>
         </header>
 
@@ -313,7 +313,7 @@
             if (!userId) return;
             setupTabs();
             updateActiveTab();
-            addRowBtn.addEventListener('click', addBulkRow);
+            addRowBtn.addEventListener('click', () => addBulkRow());
             bulkAddForm.addEventListener('submit', handleBulkAdd);
             addBulkRow(); 
 
@@ -326,7 +326,7 @@
             closeReviewModalBtn.addEventListener('click', () => reviewModal.style.display = 'none');
         }
 
-        function addBulkRow(book = { title: '', author: '' }) {
+        function addBulkRow(book = { title: '', author: '', month: '' }) {
             const rowId = `row-${Date.now()}`;
             const row = document.createElement('div');
             row.id = rowId;
@@ -709,8 +709,8 @@
             if (suggestions.length > 0) {
                 suggestions.forEach(book => {
                     const div = document.createElement('div');
-                    div.className = 'suggestion-item';
-                    div.innerHTML = `<p class="font-semibold">${book.title}</p><p class="text-sm text-gray-600">${book.author} (${book.publicationYear})</p>`;
+                    div.className = 'suggestion-item flex justify-between items-center';
+                    div.innerHTML = `<div><p class="font-semibold">${book.title}</p><p class="text-sm text-gray-600">${book.author} (${book.publicationYear})</p></div>`;
                     const selectBtn = document.createElement('button');
                     selectBtn.textContent = 'Select';
                     selectBtn.className = 'ml-4 px-2 py-1 bg-indigo-100 text-indigo-700 text-xs font-semibold rounded-full';
@@ -840,7 +840,7 @@
             e.preventDefault();
             const csvContent = "data:text/csv;charset=utf-8," 
                 + "Title,Author,Month\n"
-                + "The Hobbit,J.R.R. Tolkien,January\n";
+                + "\"The Hobbit\",\"J.R.R. Tolkien\",January\n";
             const encodedUri = encodeURI(csvContent);
             const link = document.createElement("a");
             link.setAttribute("href", encodedUri);
@@ -857,24 +857,24 @@
             const reader = new FileReader();
             reader.onload = function(e) {
                 const text = e.target.result;
-                const rows = text.split('\n').slice(1); 
+                const rows = text.split('\n').slice(1).filter(row => row.trim() !== '');
                 
                 bulkBookRows.innerHTML = '';
 
                 rows.forEach(rowStr => {
-                    const columns = rowStr.split(',');
+                    const columns = rowStr.match(/(".*?"|[^",]+)(?=\s*,|\s*$)/g) || [];
                     if (columns.length >= 3) {
                         const book = {
-                            title: columns[0].trim(),
-                            author: columns[1].trim(),
-                            month: columns[2].trim()
+                            title: columns[0].replace(/"/g, '').trim(),
+                            author: columns[1].replace(/"/g, '').trim(),
+                            month: columns[2].replace(/"/g, '').trim()
                         };
                         if (book.title && book.author && book.month) {
                             addBulkRow(book);
                         }
                     }
                 });
-                if (rows.length > 0) {
+                if (rows.length === 0) {
                     addBulkRow();
                 }
             };
