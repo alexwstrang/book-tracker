@@ -133,14 +133,14 @@
 
     <div class="container mx-auto p-4 sm:p-6 lg:p-8 max-w-7xl">
         <header class="text-center mb-6">
-            <h1 class="text-3xl sm:text-4xl font-bold text-gray-900">AI Book Tracker v3.0</h1>
+            <h1 class="text-3xl sm:text-4xl font-bold text-gray-900">AI Book Tracker v3.1</h1>
             <p class="text-md text-gray-600 mt-2">Your personal reading history from 2014 to present.</p>
         </header>
 
-        <div class="mb-6 flex justify-between items-center border-b border-gray-200">
+        <div class="mb-6 flex justify-between items-start border-b border-gray-200">
             <nav class="-mb-px flex flex-wrap gap-x-2 gap-y-2" aria-label="Tabs" id="year-tabs">
             </nav>
-            <div class="space-x-2">
+            <div class="flex-shrink-0 flex items-center space-x-2">
                 <button id="view-toggle-btn" class="px-4 py-2 border border-transparent text-sm font-medium rounded-md text-indigo-700 bg-indigo-100 hover:bg-indigo-200">Switch to Gallery View</button>
                 <button id="view-stats-btn" class="px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700">View Stats</button>
             </div>
@@ -288,6 +288,14 @@
         </div>
     </div>
     
+    <!-- Gallery Detail Modal -->
+    <div id="gallery-detail-modal" class="modal">
+        <div class="bg-white rounded-lg shadow-xl m-4 sm:m-8 max-w-md w-full mx-auto my-auto p-6 relative">
+             <button id="close-gallery-detail-modal" class="absolute top-4 right-4 text-gray-500 hover:text-gray-800 text-3xl font-bold">&times;</button>
+             <div id="gallery-detail-content"></div>
+        </div>
+    </div>
+    
     <div id="genre-suggestions-container" class="suggestions-container hidden"></div>
     
     <div id="image-modal" class="modal">
@@ -359,6 +367,9 @@
         const listView = document.getElementById('list-view');
         const galleryView = document.getElementById('gallery-view');
         const galleryContainer = document.getElementById('gallery-container');
+        const galleryDetailModal = document.getElementById('gallery-detail-modal');
+        const closeGalleryDetailModalBtn = document.getElementById('close-gallery-detail-modal');
+        const galleryDetailContent = document.getElementById('gallery-detail-content');
 
         async function initializeFirebase() {
             try {
@@ -416,6 +427,7 @@
                 if (e.target === imageModal) closeImageModal();
             });
             viewToggleBtn.addEventListener('click', toggleView);
+            closeGalleryDetailModalBtn.addEventListener('click', () => galleryDetailModal.style.display = 'none');
         }
 
         function addBulkRow(book = { title: '', author: '', month: '', publicationYear: '', olid: '', isbn: '' }) {
@@ -606,11 +618,14 @@
         function listenForAllBooks() {
             if (!db || !userId) return;
             const booksCollectionRef = collection(db, `users/${userId}/books`);
-            const q = query(booksCollectionRef, orderBy("order", "asc"));
+            const q = query(booksCollectionRef, orderBy("yearRead", "asc"), orderBy("order", "asc"));
             onSnapshot(q, (querySnapshot) => {
                 allBooks = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
                 fetchAllUserGenres();
                 renderCurrentView();
+            }, (error) => {
+                console.error("Error fetching all books:", error);
+                showError("Could not load your full book library. A Firebase index may be required.");
             });
         }
 
@@ -1144,7 +1159,7 @@
         function renderGalleryView() {
             const selectedYears = Array.from(document.querySelectorAll('.year-checkbox:checked')).map(cb => parseInt(cb.dataset.year));
             if (selectedYears.length === 0) {
-                selectedYears.push(currentYear); // Default to current year if none selected
+                selectedYears.push(currentYear); 
                 const currentYearCheckbox = document.getElementById(`year-check-${currentYear}`);
                 if (currentYearCheckbox) currentYearCheckbox.checked = true;
             }
@@ -1154,16 +1169,31 @@
             if (booksToShow.length > 0) {
                 booksToShow.forEach(book => {
                     const div = document.createElement('div');
+                    div.className = "cursor-pointer";
+                    div.dataset.id = book.id;
                     div.innerHTML = `
                         <img src="${book.coverImageUrl || 'https://placehold.co/200x300/e2e8f0/94a3b8?text=No+Image'}" 
                              alt="Cover of ${book.title}" 
                              class="h-48 w-full object-cover rounded-md shadow-lg"
                              onerror="this.onerror=null;this.src='https://placehold.co/200x300/e2e8f0/94a3b8?text=Error';">
                     `;
+                    div.addEventListener('click', () => showGalleryDetail(book.id));
                     galleryContainer.appendChild(div);
                 });
             } else {
                 galleryContainer.innerHTML = '<p class="col-span-full text-center text-gray-500">No books to display for the selected year(s).</p>';
+            }
+        }
+        
+        function showGalleryDetail(bookId) {
+            const book = allBooks.find(b => b.id === bookId);
+            if (book) {
+                galleryDetailContent.innerHTML = `
+                    <h3 class="text-xl font-bold">${book.title}</h3>
+                    <p class="text-md text-gray-700">${book.author}</p>
+                    <p class="text-sm text-gray-500 mt-2">Read: ${book.monthRead} ${book.yearRead}</p>
+                `;
+                galleryDetailModal.style.display = 'flex';
             }
         }
 
