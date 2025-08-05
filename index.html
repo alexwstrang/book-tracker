@@ -144,7 +144,7 @@
 
     <div class="container mx-auto p-4 sm:p-6 lg:p-8 max-w-7xl">
         <header class="text-center mb-6">
-            <h1 class="text-3xl sm:text-4xl font-bold text-gray-900">AI Book Tracker v3.5</h1>
+            <h1 class="text-3xl sm:text-4xl font-bold text-gray-900">AI Book Tracker v3.6</h1>
             <p class="text-md text-gray-600 mt-2">Your personal reading history from 2014 to present.</p>
         </header>
 
@@ -455,16 +455,16 @@
             closeAuthorDetailModalBtn.addEventListener('click', () => authorDetailModal.style.display = 'none');
         }
 
-        function addBulkRow(book = { title: '', author: '', month: '', publicationYear: '', olid: '', isbn: '', pageCount: '' }) {
+        function addBulkRow(book = { title: '', author: '', month: '', publicationYear: '', olid: '', isbn: '' }) {
             const rowId = `row-${Date.now()}`;
             const row = document.createElement('div');
             row.id = rowId;
-            row.className = 'grid grid-cols-1 md:grid-cols-12 gap-4 items-end p-2 border rounded-md';
+            row.className = 'grid grid-cols-1 md:grid-cols-10 gap-4 items-end p-2 border rounded-md';
             row.dataset.publicationYear = book.publicationYear;
             row.dataset.olid = book.olid;
             row.dataset.isbn = book.isbn;
             row.innerHTML = `
-                <div class="md:col-span-3 relative">
+                <div class="md:col-span-4 relative">
                     <label class="block text-sm font-medium text-gray-700">Book Title</label>
                     <input type="text" required class="mt-1 bulk-title w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" autocomplete="off" value="${book.title}">
                     <div class="title-suggestions suggestions-container hidden"></div>
@@ -490,10 +490,6 @@
                         <option value="November" ${book.month === 'November' ? 'selected' : ''}>Nov</option>
                         <option value="December" ${book.month === 'December' ? 'selected' : ''}>Dec</option>
                     </select>
-                </div>
-                <div class="md:col-span-1">
-                    <label class="block text-sm font-medium text-gray-700">Pages</label>
-                    <input type="number" class="mt-1 bulk-pages w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" value="${book.pageCount}">
                 </div>
                 <div class="md:col-span-1 flex items-center justify-end">
                     <button type="button" class="text-red-500 hover:text-red-700" onclick="document.getElementById('${rowId}').remove()">
@@ -560,17 +556,20 @@
                     const needsReview = book.fictionStatus === 'N/A' || book.genre === 'N/A';
                     row.innerHTML = `
                         <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-500">${index + 1}</td>
-                        <td class="px-6 py-4 whitespace-nowrap">
-                            <div contenteditable="true" data-id="${book.id}" data-field="title" class="editable-cell text-sm font-medium text-gray-900">${book.title}</div>
+                         <td class="px-6 py-4 whitespace-nowrap">
+                             <img src="${book.coverImageUrl || 'https://placehold.co/80x120/e2e8f0/94a3b8?text=No+Image'}" 
+                                 alt="Cover of ${book.title}" 
+                                 class="h-20 w-auto object-contain rounded-md shadow-sm thumbnail-img cursor-pointer"
+                                 data-id="${book.id}">
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap max-w-xs truncate" title="${book.title}">
+                            <div class="text-sm font-medium text-gray-900">${book.title}</div>
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap">
-                            <div contenteditable="true" data-id="${book.id}" data-field="author" class="editable-cell text-sm text-gray-500">${book.author}</div>
+                            <div class="text-sm text-gray-500">${book.author}</div>
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap">
                             <div class="text-sm text-gray-500">${book.monthRead || 'N/A'}</div>
-                        </td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            <div contenteditable="true" data-id="${book.id}" data-field="pageCount" class="editable-cell min-w-[60px]">${book.pageCount || ''}</div>
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap min-w-[120px]">
                             <select data-id="${book.id}" data-field="fictionStatus" class="editable-select text-sm text-gray-500 rounded-md border-gray-300 focus:ring-indigo-500 focus:border-indigo-500">
@@ -604,6 +603,12 @@
                     button.addEventListener('click', (e) => {
                         const { id, title, author } = e.target.closest('button').dataset;
                         handleReviewBook(id, title, author);
+                    });
+                });
+
+                document.querySelectorAll('.thumbnail-img').forEach(img => {
+                    img.addEventListener('click', (e) => {
+                        handleEditArtwork(e.target.dataset.id);
                     });
                 });
 
@@ -668,8 +673,8 @@
                 const author = row.querySelector('.bulk-author').value.trim();
                 const monthRead = row.querySelector('.bulk-month').value;
                 const publicationYear = row.dataset.publicationYear || 'N/A';
-                const pageCount = row.querySelector('.bulk-pages').value.trim() || 'N/A';
                 const olid = row.dataset.olid || null;
+                const isbn = row.dataset.isbn || null;
 
                 if (title && author && monthRead) {
                     try {
@@ -677,15 +682,15 @@
                         booksToAdd.push({
                             title, author, monthRead, yearRead: currentYear,
                             publicationYear: publicationYear,
-                            pageCount: pageCount,
                             fictionStatus: bookData.fictionStatus || 'N/A',
                             genre: bookData.genre || 'N/A',
+                            coverImageUrl: isbn ? `https://covers.openlibrary.org/b/isbn/${isbn}-L.jpg` : '',
                             olid: olid,
                             createdAt: new Date()
                         });
                     } catch (error) {
                         console.error(`Failed to fetch data for ${title}:`, error);
-                        booksToAdd.push({ title, author, monthRead, yearRead: currentYear, publicationYear, pageCount, fictionStatus: 'N/A', genre: 'N/A', olid: null });
+                        booksToAdd.push({ title, author, monthRead, yearRead: currentYear, publicationYear, fictionStatus: 'N/A', genre: 'N/A', coverImageUrl: '', olid: null });
                     }
                 }
                 processedCount++;
@@ -759,10 +764,6 @@
             const books = scope === 'year' ? allBooks.filter(b => b.yearRead === currentYear) : allBooks;
 
             const totalBooks = books.length;
-            const totalPages = books.reduce((sum, book) => sum + (parseInt(book.pageCount) || 0), 0);
-            const avgLength = totalBooks > 0 ? Math.round(totalPages / totalBooks) : 0;
-            const longestBook = books.reduce((longest, book) => (parseInt(book.pageCount) || 0) > (parseInt(longest.pageCount) || 0) ? book : longest, { title: 'N/A', pageCount: 0 });
-
             const authors = books.map(b => b.author);
             const uniqueAuthors = new Set(authors).size;
             
@@ -792,13 +793,10 @@
 
 
             document.getElementById('stats-total-books').textContent = totalBooks;
-            document.getElementById('stats-total-pages').textContent = totalPages.toLocaleString();
-            document.getElementById('stats-avg-length').textContent = `${avgLength} pgs`;
             document.getElementById('stats-unique-authors').textContent = uniqueAuthors;
             const topAuthorEl = document.getElementById('stats-top-author');
             topAuthorEl.textContent = topAuthor;
             topAuthorEl.onclick = () => showAuthorDetail(topAuthor, scope);
-            document.getElementById('stats-longest-book').textContent = `${longestBook.title} (${longestBook.pageCount} pgs)`;
 
             updateChart(fictionChart, 'fiction-chart', 'pie', Object.keys(fictionCounts), Object.values(fictionCounts), 'Fiction vs Non-Fiction');
             updateChart(genreChart, 'genre-chart', 'bar', sortedGenres.map(g => g[0]), sortedGenres.map(g => g[1]), 'Top 5 Genres');
@@ -892,7 +890,6 @@
                     div.onmousedown = () => {
                         titleInput.value = book.title;
                         authorInput.value = book.author;
-                        pagesInput.value = book.pageCount;
                         row.dataset.publicationYear = book.publicationYear;
                         row.dataset.olid = book.olid;
                         row.dataset.isbn = book.isbn;
@@ -945,6 +942,24 @@
             }
         }
 
+        async function handleEditArtwork(bookId) {
+            currentEditingBookId = bookId;
+            artworkUrlModal.style.display = 'flex';
+        }
+
+        async function handleSaveArtworkUrl() {
+            const url = artworkUrlInput.value.trim();
+            if (url && currentEditingBookId) {
+                await updateDoc(doc(db, `users/${userId}/books`, currentEditingBookId), {
+                    coverImageUrl: url
+                });
+                artworkUrlModal.style.display = 'none';
+                artworkUrlInput.value = '';
+                currentEditingBookId = null;
+            }
+        }
+
+
         async function fetchBookSuggestions(searchTerm) {
             try {
                 const response = await fetch(`https://openlibrary.org/search.json?q=${encodeURIComponent(searchTerm)}`);
@@ -965,7 +980,7 @@
         }
 
         async function fetchBookData(title, author, olid) {
-            const prompt = `For the book "${title}" by "${author}" (Open Library ID: ${olid || 'Unknown'}), provide whether it is "Fiction" or "Non-Fiction", its primary genre, and its page count as a number. If a field is unknown, return "N/A".`;
+            const prompt = `For the book "${title}" by "${author}" (Open Library ID: ${olid || 'Unknown'}), provide whether it is "Fiction" or "Non-Fiction", and its primary genre. If a field is unknown, return "N/A".`;
             const payload = {
                 contents: [{ role: "user", parts: [{ text: prompt }] }],
                 generationConfig: {
@@ -974,10 +989,9 @@
                         type: "OBJECT",
                         properties: { 
                             fictionStatus: { type: "STRING" }, 
-                            genre: { type: "STRING" },
-                            pageCount: { type: "STRING" }
+                            genre: { type: "STRING" }
                         },
-                        required: ["fictionStatus", "genre", "pageCount"]
+                        required: ["fictionStatus", "genre"]
                     }
                 }
             };
@@ -989,7 +1003,7 @@
             if (result.candidates?.[0]?.content?.parts?.[0]) {
                 return JSON.parse(result.candidates[0].content.parts[0].text);
             }
-            return { fictionStatus: 'N/A', genre: 'N/A', pageCount: 'N/A' };
+            return { fictionStatus: 'N/A', genre: 'N/A' };
         }
         
         async function fetchBookDataByIsbn(isbn) {
