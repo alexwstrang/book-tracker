@@ -115,7 +115,7 @@
 
     <div class="container mx-auto p-4 sm:p-6 lg:p-8 max-w-7xl">
         <header class="text-center mb-6">
-            <h1 class="text-3xl sm:text-4xl font-bold text-gray-900">AI Book Tracker v1.7</h1>
+            <h1 class="text-3xl sm:text-4xl font-bold text-gray-900">AI Book Tracker v1.8</h1>
             <p class="text-md text-gray-600 mt-2">Your personal reading history from 2014 to present.</p>
         </header>
 
@@ -129,10 +129,20 @@
             <div class="mb-6 pb-6 border-b border-gray-200">
                 <h2 class="text-xl font-semibold mb-3">Add Books to <span id="current-year-label"></span></h2>
                 
-                <div class="mb-6 p-4 bg-gray-50 rounded-lg">
-                    <h3 class="font-semibold mb-2">Import from CSV</h3>
-                    <p class="text-sm text-gray-600 mb-2">Upload a CSV file with columns: Title, Author, Month. <a href="#" id="download-template-link" class="text-indigo-600 hover:underline">Download template</a></p>
-                    <input type="file" id="csv-file-input" accept=".csv" class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100"/>
+                <div class="mb-6 p-4 bg-gray-50 rounded-lg grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                        <h3 class="font-semibold mb-2">Import from CSV</h3>
+                        <p class="text-sm text-gray-600 mb-2">Upload a CSV file with columns: Title, Author, Month. <a href="#" id="download-template-link" class="text-indigo-600 hover:underline">Download template</a></p>
+                        <input type="file" id="csv-file-input" accept=".csv" class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100"/>
+                    </div>
+                     <div>
+                        <h3 class="font-semibold mb-2">Add by ISBN</h3>
+                        <p class="text-sm text-gray-600 mb-2">Enter a 10 or 13-digit ISBN to find a book.</p>
+                        <div class="flex items-center space-x-2">
+                            <input type="text" id="isbn-input" placeholder="e.g., 9780345391803" class="block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                            <button type="button" id="find-by-isbn-btn" class="px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700">Find</button>
+                        </div>
+                    </div>
                 </div>
 
                 <form id="bulk-add-form">
@@ -281,6 +291,8 @@
         const reviewModal = document.getElementById('review-modal');
         const closeReviewModalBtn = document.getElementById('close-review-modal');
         const reviewSuggestionsContainer = document.getElementById('review-suggestions');
+        const isbnInput = document.getElementById('isbn-input');
+        const findByIsbnBtn = document.getElementById('find-by-isbn-btn');
 
         async function initializeFirebase() {
             try {
@@ -324,13 +336,15 @@
             csvFileInput.addEventListener('change', handleCsvUpload);
             downloadTemplateLink.addEventListener('click', downloadCsvTemplate);
             closeReviewModalBtn.addEventListener('click', () => reviewModal.style.display = 'none');
+            findByIsbnBtn.addEventListener('click', handleIsbnSearch);
         }
 
-        function addBulkRow(book = { title: '', author: '', month: '' }) {
+        function addBulkRow(book = { title: '', author: '', month: '', publicationYear: '' }) {
             const rowId = `row-${Date.now()}`;
             const row = document.createElement('div');
             row.id = rowId;
             row.className = 'grid grid-cols-1 md:grid-cols-10 gap-4 items-end p-2 border rounded-md';
+            row.dataset.publicationYear = book.publicationYear;
             row.innerHTML = `
                 <div class="md:col-span-4 relative">
                     <label class="block text-sm font-medium text-gray-700">Book Title</label>
@@ -794,6 +808,47 @@
             }
             return { fictionStatus: 'N/A', genre: 'N/A' };
         }
+        
+        async function fetchBookDataByIsbn(isbn) {
+            const prompt = `Based on the ISBN "${isbn}", find the book's full title, author, and original publication year.`;
+            const payload = {
+                contents: [{ role: "user", parts: [{ text: prompt }] }],
+                generationConfig: {
+                    responseMimeType: "application/json",
+                    responseSchema: {
+                        type: "OBJECT",
+                        properties: { title: { type: "STRING" }, author: { type: "STRING" }, publicationYear: { type: "STRING" } },
+                        required: ["title", "author", "publicationYear"]
+                    }
+                }
+            };
+            const apiKey = firebaseConfig.apiKey;
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
+            const response = await fetch(apiUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+            if (!response.ok) throw new Error(`ISBN lookup failed: ${response.statusText}`);
+            const result = await response.json();
+            if (result.candidates?.[0]?.content?.parts?.[0]) {
+                return JSON.parse(result.candidates[0].content.parts[0].text);
+            }
+            return null;
+        }
+
+        async function handleIsbnSearch() {
+            const isbn = isbnInput.value.trim();
+            if (!isbn) return;
+            try {
+                const bookData = await fetchBookDataByIsbn(isbn);
+                if (bookData) {
+                    addBulkRow(bookData);
+                    isbnInput.value = '';
+                } else {
+                    showError(`Could not find a book with ISBN: ${isbn}`);
+                }
+            } catch (error) {
+                console.error(error);
+                showError("There was an error searching by ISBN.");
+            }
+        }
 
         async function fetchBookDataWithRetry(title, author, retries = 3, delay = 1000) {
             for (let i = 0; i < retries; i++) {
@@ -874,7 +929,7 @@
                         }
                     }
                 });
-                if (rows.length === 0) {
+                if (rows.length === 0 || bulkBookRows.children.length === 0) {
                     addBulkRow();
                 }
             };
