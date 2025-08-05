@@ -85,7 +85,7 @@
         .suggestion-item:hover {
             background-color: #eef2ff;
         }
-        .stats-modal {
+        .modal {
             display: none;
             position: fixed;
             z-index: 1000;
@@ -115,7 +115,7 @@
 
     <div class="container mx-auto p-4 sm:p-6 lg:p-8 max-w-7xl">
         <header class="text-center mb-6">
-            <h1 class="text-3xl sm:text-4xl font-bold text-gray-900">AI Book Tracker v1.5</h1>
+            <h1 class="text-3xl sm:text-4xl font-bold text-gray-900">AI Book Tracker v1.6</h1>
             <p class="text-md text-gray-600 mt-2">Your personal reading history from 2014 to present.</p>
         </header>
 
@@ -128,6 +128,13 @@
         <div id="main-content" class="bg-white p-4 sm:p-6 rounded-xl shadow-lg">
             <div class="mb-6 pb-6 border-b border-gray-200">
                 <h2 class="text-xl font-semibold mb-3">Add Books to <span id="current-year-label"></span></h2>
+                
+                <div class="mb-6 p-4 bg-gray-50 rounded-lg">
+                    <h3 class="font-semibold mb-2">Import from CSV</h3>
+                    <p class="text-sm text-gray-600 mb-2">Upload a CSV file with columns: Title, Author, Month. <a href="#" id="download-template-link" class="text-indigo-600 hover:underline">Download template</a></p>
+                    <input type="file" id="csv-file-input" accept=".csv" class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100"/>
+                </div>
+
                 <form id="bulk-add-form">
                     <div id="bulk-book-rows" class="space-y-4"></div>
                     <div class="mt-4 flex justify-between items-center">
@@ -181,7 +188,7 @@
     </div>
 
     <!-- Stats Modal -->
-    <div id="stats-modal" class="stats-modal">
+    <div id="stats-modal" class="modal">
         <div class="bg-white rounded-lg shadow-xl m-4 sm:m-8 max-w-4xl w-full mx-auto my-auto p-6 relative">
              <button id="close-stats-modal" class="absolute top-4 right-4 text-gray-500 hover:text-gray-800 text-3xl font-bold">&times;</button>
              <h2 class="text-2xl font-bold mb-4">Reading Statistics</h2>
@@ -217,6 +224,16 @@
                     </div>
                 </div>
              </div>
+        </div>
+    </div>
+
+    <!-- Review Modal -->
+    <div id="review-modal" class="modal">
+        <div class="bg-white rounded-lg shadow-xl m-4 sm:m-8 max-w-2xl w-full mx-auto my-auto p-6 relative">
+             <button id="close-review-modal" class="absolute top-4 right-4 text-gray-500 hover:text-gray-800 text-3xl font-bold">&times;</button>
+             <h2 class="text-2xl font-bold mb-2">Review Book</h2>
+             <p class="text-sm text-gray-600 mb-4">The AI couldn't find a confident match. Is it one of these?</p>
+             <div id="review-suggestions" class="space-y-2"></div>
         </div>
     </div>
 
@@ -259,6 +276,11 @@
         const closeStatsModalBtn = document.getElementById('close-stats-modal');
         const statsYearBtn = document.getElementById('stats-year-btn');
         const statsAllBtn = document.getElementById('stats-all-btn');
+        const csvFileInput = document.getElementById('csv-file-input');
+        const downloadTemplateLink = document.getElementById('download-template-link');
+        const reviewModal = document.getElementById('review-modal');
+        const closeReviewModalBtn = document.getElementById('close-review-modal');
+        const reviewSuggestionsContainer = document.getElementById('review-suggestions');
 
         async function initializeFirebase() {
             try {
@@ -299,9 +321,12 @@
             closeStatsModalBtn.addEventListener('click', () => statsModal.style.display = 'none');
             statsYearBtn.addEventListener('click', () => generateStats('year'));
             statsAllBtn.addEventListener('click', () => generateStats('all'));
+            csvFileInput.addEventListener('change', handleCsvUpload);
+            downloadTemplateLink.addEventListener('click', downloadCsvTemplate);
+            closeReviewModalBtn.addEventListener('click', () => reviewModal.style.display = 'none');
         }
 
-        function addBulkRow() {
+        function addBulkRow(book = { title: '', author: '' }) {
             const rowId = `row-${Date.now()}`;
             const row = document.createElement('div');
             row.id = rowId;
@@ -309,29 +334,29 @@
             row.innerHTML = `
                 <div class="md:col-span-4 relative">
                     <label class="block text-sm font-medium text-gray-700">Book Title</label>
-                    <input type="text" required class="mt-1 bulk-title w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" autocomplete="off">
+                    <input type="text" required class="mt-1 bulk-title w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" autocomplete="off" value="${book.title}">
                     <div class="title-suggestions suggestions-container hidden"></div>
                 </div>
                 <div class="md:col-span-3 relative">
                     <label class="block text-sm font-medium text-gray-700">Author</label>
-                    <input type="text" required class="mt-1 bulk-author w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" autocomplete="off">
+                    <input type="text" required class="mt-1 bulk-author w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" autocomplete="off" value="${book.author}">
                 </div>
                 <div class="md:col-span-2">
                     <label class="block text-sm font-medium text-gray-700">Month Read</label>
                     <select required class="mt-1 bulk-month w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
                         <option value="">Select</option>
-                        <option value="January">Jan</option>
-                        <option value="February">Feb</option>
-                        <option value="March">Mar</option>
-                        <option value="April">Apr</option>
-                        <option value="May">May</option>
-                        <option value="June">Jun</option>
-                        <option value="July">Jul</option>
-                        <option value="August">Aug</option>
-                        <option value="September">Sep</option>
-                        <option value="October">Oct</option>
-                        <option value="November">Nov</option>
-                        <option value="December">Dec</option>
+                        <option value="January" ${book.month === 'January' ? 'selected' : ''}>Jan</option>
+                        <option value="February" ${book.month === 'February' ? 'selected' : ''}>Feb</option>
+                        <option value="March" ${book.month === 'March' ? 'selected' : ''}>Mar</option>
+                        <option value="April" ${book.month === 'April' ? 'selected' : ''}>Apr</option>
+                        <option value="May" ${book.month === 'May' ? 'selected' : ''}>May</option>
+                        <option value="June" ${book.month === 'June' ? 'selected' : ''}>Jun</option>
+                        <option value="July" ${book.month === 'July' ? 'selected' : ''}>Jul</option>
+                        <option value="August" ${book.month === 'August' ? 'selected' : ''}>Aug</option>
+                        <option value="September" ${book.month === 'September' ? 'selected' : ''}>Sep</option>
+                        <option value="October" ${book.month === 'October' ? 'selected' : ''}>Oct</option>
+                        <option value="November" ${book.month === 'November' ? 'selected' : ''}>Nov</option>
+                        <option value="December" ${book.month === 'December' ? 'selected' : ''}>Dec</option>
                     </select>
                 </div>
                 <div class="md:col-span-1 flex items-center justify-end">
@@ -392,6 +417,7 @@
                 books.forEach(book => {
                     const row = document.createElement('tr');
                     row.id = book.id; 
+                    const needsReview = book.fictionStatus === 'N/A' || book.genre === 'N/A';
                     row.innerHTML = `
                         <td class="px-2 py-4 whitespace-nowrap text-gray-400 text-center drag-handle">
                             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" class="inline-block" viewBox="0 0 16 16">
@@ -420,7 +446,8 @@
                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                             <div contenteditable="true" data-id="${book.id}" data-field="publicationYear" class="editable-cell min-w-[60px]">${book.publicationYear || ''}</div>
                         </td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">
+                            ${needsReview ? `<button data-id="${book.id}" data-title="${book.title}" data-author="${book.author}" class="text-yellow-600 hover:text-yellow-900 review-btn">Review</button>` : ''}
                             <button data-id="${book.id}" class="text-red-600 hover:text-red-900 delete-btn">Delete</button>
                         </td>
                     `;
@@ -431,6 +458,13 @@
                     button.addEventListener('click', (e) => {
                         const bookId = e.target.closest('button').dataset.id;
                         handleDeleteBook(bookId);
+                    });
+                });
+                
+                document.querySelectorAll('.review-btn').forEach(button => {
+                    button.addEventListener('click', (e) => {
+                        const { id, title, author } = e.target.closest('button').dataset;
+                        handleReviewBook(id, title, author);
                     });
                 });
 
@@ -505,7 +539,7 @@
                         });
                     } catch (error) {
                         console.error(`Failed to fetch data for ${title}:`, error);
-                        booksToAdd.push({ title, author, monthRead, yearRead: currentYear, publicationYear });
+                        booksToAdd.push({ title, author, monthRead, yearRead: currentYear, publicationYear, fictionStatus: 'N/A', genre: 'N/A' });
                     }
                 }
                 processedCount++;
@@ -666,6 +700,39 @@
             }
         }
 
+        async function handleReviewBook(bookId, title, author) {
+            reviewModal.style.display = 'flex';
+            reviewSuggestionsContainer.innerHTML = '<p>Searching for matches...</p>';
+            const suggestions = await fetchBookSuggestions(title);
+            reviewSuggestionsContainer.innerHTML = '';
+
+            if (suggestions.length > 0) {
+                suggestions.forEach(book => {
+                    const div = document.createElement('div');
+                    div.className = 'suggestion-item';
+                    div.innerHTML = `<p class="font-semibold">${book.title}</p><p class="text-sm text-gray-600">${book.author} (${book.publicationYear})</p>`;
+                    const selectBtn = document.createElement('button');
+                    selectBtn.textContent = 'Select';
+                    selectBtn.className = 'ml-4 px-2 py-1 bg-indigo-100 text-indigo-700 text-xs font-semibold rounded-full';
+                    selectBtn.onclick = async () => {
+                        const bookData = await fetchBookDataWithRetry(book.title, book.author);
+                        await updateDoc(doc(db, `users/${userId}/books`, bookId), {
+                            title: book.title,
+                            author: book.author,
+                            publicationYear: book.publicationYear,
+                            fictionStatus: bookData.fictionStatus,
+                            genre: bookData.genre
+                        });
+                        reviewModal.style.display = 'none';
+                    };
+                    div.appendChild(selectBtn);
+                    reviewSuggestionsContainer.appendChild(div);
+                });
+            } else {
+                reviewSuggestionsContainer.innerHTML = '<p>No likely matches found.</p>';
+            }
+        }
+
         async function fetchBookSuggestions(searchTerm) {
              const prompt = `Find books matching the search term "${searchTerm}". Return a JSON array of up to 5 objects, each with "title", "author", and "publicationYear" keys.`;
             const payload = {
@@ -768,6 +835,53 @@
         function hideError() {
             errorMessage.classList.add('hidden');
         }
+        
+        function downloadCsvTemplate(e) {
+            e.preventDefault();
+            const csvContent = "data:text/csv;charset=utf-8," 
+                + "Title,Author,Month\n"
+                + "The Hobbit,J.R.R. Tolkien,January\n";
+            const encodedUri = encodeURI(csvContent);
+            const link = document.createElement("a");
+            link.setAttribute("href", encodedUri);
+            link.setAttribute("download", "book_template.csv");
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        function handleCsvUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const text = e.target.result;
+                const rows = text.split('\n').slice(1); 
+                
+                bulkBookRows.innerHTML = '';
+
+                rows.forEach(rowStr => {
+                    const columns = rowStr.split(',');
+                    if (columns.length >= 3) {
+                        const book = {
+                            title: columns[0].trim(),
+                            author: columns[1].trim(),
+                            month: columns[2].trim()
+                        };
+                        if (book.title && book.author && book.month) {
+                            addBulkRow(book);
+                        }
+                    }
+                });
+                if (rows.length > 0) {
+                    addBulkRow();
+                }
+            };
+            reader.readAsText(file);
+            csvFileInput.value = '';
+        }
+
 
         window.onload = initializeFirebase;
 
