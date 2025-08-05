@@ -127,13 +127,24 @@
             transition: 0.3s;
             cursor: pointer;
         }
+        .heatmap-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 0.5rem;
+        }
+        .heatmap-cell {
+            padding: 0.75rem;
+            border-radius: 0.375rem;
+            text-align: center;
+            color: #1f2937;
+        }
     </style>
 </head>
 <body class="bg-gray-100 text-gray-800">
 
     <div class="container mx-auto p-4 sm:p-6 lg:p-8 max-w-7xl">
         <header class="text-center mb-6">
-            <h1 class="text-3xl sm:text-4xl font-bold text-gray-900">AI Book Tracker v3.3</h1>
+            <h1 class="text-3xl sm:text-4xl font-bold text-gray-900">AI Book Tracker v3.4</h1>
             <p class="text-md text-gray-600 mt-2">Your personal reading history from 2014 to present.</p>
         </header>
 
@@ -197,10 +208,10 @@
                         <thead class="bg-gray-50 sticky top-0">
                             <tr>
                                 <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">#</th>
-                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cover</th>
                                 <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Title</th>
                                 <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Author</th>
                                 <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Month Read</th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Pages</th>
                                 <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
                                 <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Genre</th>
                                 <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Published</th>
@@ -229,7 +240,7 @@
 
     <!-- Stats Modal -->
     <div id="stats-modal" class="modal">
-        <div class="bg-white rounded-lg shadow-xl m-4 sm:m-8 max-w-4xl w-full mx-auto my-auto p-6 relative">
+        <div class="bg-white rounded-lg shadow-xl m-4 sm:m-8 max-w-6xl w-full mx-auto my-auto p-6 relative overflow-y-auto max-h-[90vh]">
              <button id="close-stats-modal" class="absolute top-4 right-4 text-gray-500 hover:text-gray-800 text-3xl font-bold">&times;</button>
              <h2 class="text-2xl font-bold mb-4">Reading Statistics</h2>
              <div class="mb-4">
@@ -245,15 +256,25 @@
                         <p id="stats-total-books" class="text-3xl font-bold"></p>
                     </div>
                     <div class="p-4 bg-gray-100 rounded-lg">
-                        <p class="text-sm text-gray-600">Unique Authors</p>
-                        <p id="stats-unique-authors" class="text-3xl font-bold"></p>
+                        <p class="text-sm text-gray-600">Total Pages Read</p>
+                        <p id="stats-total-pages" class="text-3xl font-bold"></p>
                     </div>
                      <div class="p-4 bg-gray-100 rounded-lg">
-                        <p class="text-sm text-gray-600">Most Read Author</p>
-                        <p id="stats-top-author" class="text-xl font-bold truncate"></p>
+                        <p class="text-sm text-gray-600">Avg. Book Length</p>
+                        <p id="stats-avg-length" class="text-3xl font-bold"></p>
                     </div>
                 </div>
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6 text-center">
+                    <div class="p-4 bg-gray-100 rounded-lg">
+                        <p class="text-sm text-gray-600">Most Read Author</p>
+                        <p id="stats-top-author" class="text-xl font-bold truncate cursor-pointer hover:text-indigo-600"></p>
+                    </div>
+                     <div class="p-4 bg-gray-100 rounded-lg">
+                        <p class="text-sm text-gray-600">Longest Book</p>
+                        <p id="stats-longest-book" class="text-xl font-bold truncate"></p>
+                    </div>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
                     <div>
                         <h3 class="font-semibold mb-2">Fiction vs. Non-Fiction</h3>
                         <canvas id="fiction-chart"></canvas>
@@ -261,6 +282,16 @@
                     <div>
                         <h3 class="font-semibold mb-2">Top Genres</h3>
                         <canvas id="genre-chart"></canvas>
+                    </div>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                        <h3 class="font-semibold mb-2">Reading Heatmap by Month</h3>
+                        <div id="heatmap-container" class="heatmap-grid"></div>
+                    </div>
+                    <div>
+                        <h3 class="font-semibold mb-2">Books by Publication Decade</h3>
+                        <canvas id="decade-chart"></canvas>
                     </div>
                 </div>
              </div>
@@ -277,22 +308,12 @@
         </div>
     </div>
     
-    <!-- Artwork URL Modal -->
-    <div id="artwork-url-modal" class="modal">
+    <!-- Author Detail Modal -->
+    <div id="author-detail-modal" class="modal">
         <div class="bg-white rounded-lg shadow-xl m-4 sm:m-8 max-w-lg w-full mx-auto my-auto p-6 relative">
-             <button id="close-artwork-url-modal" class="absolute top-4 right-4 text-gray-500 hover:text-gray-800 text-3xl font-bold">&times;</button>
-             <h2 class="text-2xl font-bold mb-2">Edit Artwork URL</h2>
-             <p class="text-sm text-gray-600 mb-4">Paste the URL for the book cover image.</p>
-             <input type="text" id="artwork-url-input" class="w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
-             <button id="save-artwork-url-btn" class="mt-4 w-full px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700">Save</button>
-        </div>
-    </div>
-    
-    <!-- Gallery Detail Modal -->
-    <div id="gallery-detail-modal" class="modal">
-        <div class="bg-white rounded-lg shadow-xl m-4 sm:m-8 max-w-md w-full mx-auto my-auto p-6 relative">
-             <button id="close-gallery-detail-modal" class="absolute top-4 right-4 text-gray-500 hover:text-gray-800 text-3xl font-bold">&times;</button>
-             <div id="gallery-detail-content"></div>
+             <button id="close-author-detail-modal" class="absolute top-4 right-4 text-gray-500 hover:text-gray-800 text-3xl font-bold">&times;</button>
+             <h2 id="author-detail-title" class="text-2xl font-bold mb-4"></h2>
+             <ul id="author-detail-list" class="list-disc list-inside space-y-1"></ul>
         </div>
     </div>
     
@@ -312,7 +333,7 @@
         let currentYear = new Date().getFullYear();
         let db, auth, userId;
         let sortableInstance = null; 
-        let fictionChart, genreChart;
+        let fictionChart, genreChart, monthlyChart, decadeChart;
         let allUserGenres = [];
         let allBooks = [];
         let currentEditingBookId = null;
@@ -350,10 +371,6 @@
         const reviewModal = document.getElementById('review-modal');
         const closeReviewModalBtn = document.getElementById('close-review-modal');
         const reviewSuggestionsContainer = document.getElementById('review-suggestions');
-        const artworkUrlModal = document.getElementById('artwork-url-modal');
-        const closeArtworkUrlModalBtn = document.getElementById('close-artwork-url-modal');
-        const artworkUrlInput = document.getElementById('artwork-url-input');
-        const saveArtworkUrlBtn = document.getElementById('save-artwork-url-btn');
         const isbnInput = document.getElementById('isbn-input');
         const findByIsbnBtn = document.getElementById('find-by-isbn-btn');
         const toggleImportBtn = document.getElementById('toggle-import-btn');
@@ -369,6 +386,10 @@
         const galleryDetailModal = document.getElementById('gallery-detail-modal');
         const closeGalleryDetailModalBtn = document.getElementById('close-gallery-detail-modal');
         const galleryDetailContent = document.getElementById('gallery-detail-content');
+        const authorDetailModal = document.getElementById('author-detail-modal');
+        const closeAuthorDetailModalBtn = document.getElementById('close-author-detail-modal');
+        const authorDetailTitle = document.getElementById('author-detail-title');
+        const authorDetailList = document.getElementById('author-detail-list');
 
         async function initializeFirebase() {
             try {
@@ -413,8 +434,6 @@
             downloadTemplateLink.addEventListener('click', (e) => downloadCsvTemplate(e, 'title'));
             downloadIsbnTemplateLink.addEventListener('click', (e) => downloadCsvTemplate(e, 'isbn'));
             closeReviewModalBtn.addEventListener('click', () => reviewModal.style.display = 'none');
-            closeArtworkUrlModalBtn.addEventListener('click', () => artworkUrlModal.style.display = 'none');
-            saveArtworkUrlBtn.addEventListener('click', handleSaveArtworkUrl);
             findByIsbnBtn.addEventListener('click', handleIsbnSearch);
             toggleImportBtn.addEventListener('click', (e) => {
                 e.preventDefault();
@@ -427,18 +446,19 @@
             });
             viewToggleBtn.addEventListener('click', toggleView);
             closeGalleryDetailModalBtn.addEventListener('click', () => galleryDetailModal.style.display = 'none');
+            closeAuthorDetailModalBtn.addEventListener('click', () => authorDetailModal.style.display = 'none');
         }
 
-        function addBulkRow(book = { title: '', author: '', month: '', publicationYear: '', olid: '', isbn: '' }) {
+        function addBulkRow(book = { title: '', author: '', month: '', publicationYear: '', olid: '', isbn: '', pageCount: '' }) {
             const rowId = `row-${Date.now()}`;
             const row = document.createElement('div');
             row.id = rowId;
-            row.className = 'grid grid-cols-1 md:grid-cols-10 gap-4 items-end p-2 border rounded-md';
+            row.className = 'grid grid-cols-1 md:grid-cols-12 gap-4 items-end p-2 border rounded-md';
             row.dataset.publicationYear = book.publicationYear;
             row.dataset.olid = book.olid;
             row.dataset.isbn = book.isbn;
             row.innerHTML = `
-                <div class="md:col-span-4 relative">
+                <div class="md:col-span-3 relative">
                     <label class="block text-sm font-medium text-gray-700">Book Title</label>
                     <input type="text" required class="mt-1 bulk-title w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" autocomplete="off" value="${book.title}">
                     <div class="title-suggestions suggestions-container hidden"></div>
@@ -464,6 +484,10 @@
                         <option value="November" ${book.month === 'November' ? 'selected' : ''}>Nov</option>
                         <option value="December" ${book.month === 'December' ? 'selected' : ''}>Dec</option>
                     </select>
+                </div>
+                <div class="md:col-span-1">
+                    <label class="block text-sm font-medium text-gray-700">Pages</label>
+                    <input type="number" class="mt-1 bulk-pages w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" value="${book.pageCount}">
                 </div>
                 <div class="md:col-span-1 flex items-center justify-end">
                     <button type="button" class="text-red-500 hover:text-red-700" onclick="document.getElementById('${rowId}').remove()">
@@ -530,20 +554,17 @@
                     const needsReview = book.fictionStatus === 'N/A' || book.genre === 'N/A';
                     row.innerHTML = `
                         <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-500">${index + 1}</td>
-                         <td class="px-6 py-4 whitespace-nowrap">
-                             <img src="${book.coverImageUrl || 'https://placehold.co/80x120/e2e8f0/94a3b8?text=No+Image'}" 
-                                 alt="Cover of ${book.title}" 
-                                 class="h-20 w-auto object-contain rounded-md shadow-sm thumbnail-img cursor-pointer"
-                                 data-id="${book.id}">
-                        </td>
-                        <td class="px-6 py-4 whitespace-nowrap max-w-xs truncate" title="${book.title}">
-                            <div class="text-sm font-medium text-gray-900">${book.title}</div>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <div contenteditable="true" data-id="${book.id}" data-field="title" class="editable-cell text-sm font-medium text-gray-900">${book.title}</div>
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap">
-                            <div class="text-sm text-gray-500">${book.author}</div>
+                            <div contenteditable="true" data-id="${book.id}" data-field="author" class="editable-cell text-sm text-gray-500">${book.author}</div>
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap">
                             <div class="text-sm text-gray-500">${book.monthRead || 'N/A'}</div>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            <div contenteditable="true" data-id="${book.id}" data-field="pageCount" class="editable-cell min-w-[60px]">${book.pageCount || ''}</div>
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap min-w-[120px]">
                             <select data-id="${book.id}" data-field="fictionStatus" class="editable-select text-sm text-gray-500 rounded-md border-gray-300 focus:ring-indigo-500 focus:border-indigo-500">
@@ -577,12 +598,6 @@
                     button.addEventListener('click', (e) => {
                         const { id, title, author } = e.target.closest('button').dataset;
                         handleReviewBook(id, title, author);
-                    });
-                });
-
-                document.querySelectorAll('.thumbnail-img').forEach(img => {
-                    img.addEventListener('click', (e) => {
-                        handleEditArtwork(e.target.dataset.id);
                     });
                 });
 
@@ -647,6 +662,7 @@
                 const author = row.querySelector('.bulk-author').value.trim();
                 const monthRead = row.querySelector('.bulk-month').value;
                 const publicationYear = row.dataset.publicationYear || 'N/A';
+                const pageCount = row.querySelector('.bulk-pages').value.trim() || 'N/A';
                 const olid = row.dataset.olid || null;
                 const isbn = row.dataset.isbn || null;
 
@@ -656,15 +672,15 @@
                         booksToAdd.push({
                             title, author, monthRead, yearRead: currentYear,
                             publicationYear: publicationYear,
+                            pageCount: pageCount,
                             fictionStatus: bookData.fictionStatus || 'N/A',
                             genre: bookData.genre || 'N/A',
-                            coverImageUrl: isbn ? `https://covers.openlibrary.org/b/isbn/${isbn}-L.jpg` : '',
                             olid: olid,
                             createdAt: new Date()
                         });
                     } catch (error) {
                         console.error(`Failed to fetch data for ${title}:`, error);
-                        booksToAdd.push({ title, author, monthRead, yearRead: currentYear, publicationYear, fictionStatus: 'N/A', genre: 'N/A', coverImageUrl: '', olid: null });
+                        booksToAdd.push({ title, author, monthRead, yearRead: currentYear, publicationYear, pageCount, fictionStatus: 'N/A', genre: 'N/A', olid: null });
                     }
                 }
                 processedCount++;
@@ -738,6 +754,10 @@
             const books = scope === 'year' ? allBooks.filter(b => b.yearRead === currentYear) : allBooks;
 
             const totalBooks = books.length;
+            const totalPages = books.reduce((sum, book) => sum + (parseInt(book.pageCount) || 0), 0);
+            const avgLength = totalBooks > 0 ? Math.round(totalPages / totalBooks) : 0;
+            const longestBook = books.reduce((longest, book) => (parseInt(book.pageCount) || 0) > (parseInt(longest.pageCount) || 0) ? book : longest, { title: 'N/A', pageCount: 0 });
+
             const authors = books.map(b => b.author);
             const uniqueAuthors = new Set(authors).size;
             
@@ -747,13 +767,38 @@
             const fictionCounts = books.reduce((acc, book) => ({...acc, [book.fictionStatus || 'Unknown']: (acc[book.fictionStatus || 'Unknown'] || 0) + 1}), {});
             const genreCounts = books.reduce((acc, book) => ({...acc, [book.genre || 'Unknown']: (acc[book.genre || 'Unknown'] || 0) + 1}), {});
             const sortedGenres = Object.entries(genreCounts).sort(([,a],[,b]) => b-a).slice(0, 5);
+            
+            const monthlyCounts = Array(12).fill(0);
+            const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+            books.forEach(book => {
+                const monthIndex = monthNames.indexOf(book.monthRead);
+                if (monthIndex > -1) monthlyCounts[monthIndex]++;
+            });
+
+            const decadeCounts = books.reduce((acc, book) => {
+                const year = parseInt(book.publicationYear);
+                if (!isNaN(year)) {
+                    const decade = Math.floor(year / 10) * 10;
+                    acc[decade] = (acc[decade] || 0) + 1;
+                }
+                return acc;
+            }, {});
+            const sortedDecades = Object.entries(decadeCounts).sort(([a],[b]) => a - b);
+
 
             document.getElementById('stats-total-books').textContent = totalBooks;
+            document.getElementById('stats-total-pages').textContent = totalPages.toLocaleString();
+            document.getElementById('stats-avg-length').textContent = `${avgLength} pgs`;
             document.getElementById('stats-unique-authors').textContent = uniqueAuthors;
-            document.getElementById('stats-top-author').textContent = topAuthor;
+            const topAuthorEl = document.getElementById('stats-top-author');
+            topAuthorEl.textContent = topAuthor;
+            topAuthorEl.onclick = () => showAuthorDetail(topAuthor, scope);
+            document.getElementById('stats-longest-book').textContent = `${longestBook.title} (${longestBook.pageCount} pgs)`;
 
             updateChart(fictionChart, 'fiction-chart', 'pie', Object.keys(fictionCounts), Object.values(fictionCounts), 'Fiction vs Non-Fiction');
             updateChart(genreChart, 'genre-chart', 'bar', sortedGenres.map(g => g[0]), sortedGenres.map(g => g[1]), 'Top 5 Genres');
+            renderHeatmap(monthlyCounts);
+            updateChart(decadeChart, 'decade-chart', 'bar', sortedDecades.map(d => `${d[0]}s`), sortedDecades.map(d => d[1]), 'Books by Decade');
         }
 
         function updateChart(chartInstance, canvasId, type, labels, data, title) {
@@ -775,8 +820,41 @@
                 options: { responsive: true, plugins: { legend: { position: 'top' } } }
             };
 
-            if (type === 'pie') fictionChart = new Chart(ctx, chartConfig);
-            if (type === 'bar') genreChart = new Chart(ctx, chartConfig);
+            if (canvasId === 'fiction-chart') fictionChart = new Chart(ctx, chartConfig);
+            if (canvasId === 'genre-chart') genreChart = new Chart(ctx, chartConfig);
+            if (canvasId === 'decade-chart') decadeChart = new Chart(ctx, chartConfig);
+        }
+        
+        function renderHeatmap(monthlyCounts) {
+            const heatmapContainer = document.getElementById('heatmap-container');
+            heatmapContainer.innerHTML = '';
+            const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+            const maxBooks = Math.max(...monthlyCounts);
+            const colors = ['#eef2ff', '#c7d2fe', '#a5b4fc', '#818cf8', '#6366f1', '#4f46e5'];
+
+            monthlyCounts.forEach((count, index) => {
+                const cell = document.createElement('div');
+                cell.className = 'heatmap-cell';
+                let colorIndex = 0;
+                if (maxBooks > 0) {
+                    colorIndex = Math.min(colors.length - 1, Math.floor((count / maxBooks) * (colors.length - 1)));
+                }
+                cell.style.backgroundColor = count > 0 ? colors[colorIndex] : '#f3f4f6';
+                cell.innerHTML = `<div class="font-semibold">${monthNames[index]}</div><div class="text-xs">${count}</div>`;
+                heatmapContainer.appendChild(cell);
+            });
+        }
+        
+        function showAuthorDetail(author, scope) {
+            const booksByAuthor = allBooks.filter(b => b.author === author && (scope === 'all' || b.yearRead === currentYear));
+            authorDetailTitle.textContent = `Books by ${author}`;
+            authorDetailList.innerHTML = '';
+            booksByAuthor.forEach(book => {
+                const li = document.createElement('li');
+                li.textContent = `${book.title} (${book.yearRead})`;
+                authorDetailList.appendChild(li);
+            });
+            authorDetailModal.style.display = 'flex';
         }
 
         async function handleTitleInput(row) {
@@ -797,6 +875,7 @@
             const suggestionsContainer = row.querySelector('.title-suggestions');
             const titleInput = row.querySelector('.bulk-title');
             const authorInput = row.querySelector('.bulk-author');
+            const pagesInput = row.querySelector('.bulk-pages');
             suggestionsContainer.innerHTML = '';
 
             if (suggestions.length > 0) {
@@ -808,6 +887,7 @@
                     div.onmousedown = () => {
                         titleInput.value = book.title;
                         authorInput.value = book.author;
+                        pagesInput.value = book.pageCount;
                         row.dataset.publicationYear = book.publicationYear;
                         row.dataset.olid = book.olid;
                         row.dataset.isbn = book.isbn;
@@ -847,7 +927,7 @@
                             publicationYear: book.publicationYear,
                             fictionStatus: bookData.fictionStatus,
                             genre: bookData.genre,
-                            coverImageUrl: book.isbn ? `https://covers.openlibrary.org/b/isbn/${book.isbn}-L.jpg` : '',
+                            pageCount: book.pageCount,
                             olid: book.olid
                         });
                         reviewModal.style.display = 'none';
@@ -860,24 +940,6 @@
             }
         }
 
-        async function handleEditArtwork(bookId) {
-            currentEditingBookId = bookId;
-            artworkUrlModal.style.display = 'flex';
-        }
-
-        async function handleSaveArtworkUrl() {
-            const url = artworkUrlInput.value.trim();
-            if (url && currentEditingBookId) {
-                await updateDoc(doc(db, `users/${userId}/books`, currentEditingBookId), {
-                    coverImageUrl: url
-                });
-                artworkUrlModal.style.display = 'none';
-                artworkUrlInput.value = '';
-                currentEditingBookId = null;
-            }
-        }
-
-
         async function fetchBookSuggestions(searchTerm) {
             try {
                 const response = await fetch(`https://openlibrary.org/search.json?q=${encodeURIComponent(searchTerm)}`);
@@ -887,6 +949,7 @@
                     title: doc.title,
                     author: doc.author_name ? doc.author_name.join(', ') : 'N/A',
                     publicationYear: doc.first_publish_year || 'N/A',
+                    pageCount: doc.number_of_pages_median || '',
                     olid: doc.key,
                     isbn: doc.isbn ? doc.isbn[0] : null
                 }));
@@ -897,15 +960,19 @@
         }
 
         async function fetchBookData(title, author, olid) {
-            const prompt = `For the book "${title}" by "${author}" (Open Library ID: ${olid || 'Unknown'}), provide whether it is "Fiction" or "Non-Fiction", and its primary genre. If you cannot find a confident match, return "N/A" for the unknown fields.`;
+            const prompt = `For the book "${title}" by "${author}" (Open Library ID: ${olid || 'Unknown'}), provide whether it is "Fiction" or "Non-Fiction", its primary genre, and its page count as a number. If a field is unknown, return "N/A".`;
             const payload = {
                 contents: [{ role: "user", parts: [{ text: prompt }] }],
                 generationConfig: {
                     responseMimeType: "application/json",
                     responseSchema: {
                         type: "OBJECT",
-                        properties: { fictionStatus: { type: "STRING" }, genre: { type: "STRING" } },
-                        required: ["fictionStatus", "genre"]
+                        properties: { 
+                            fictionStatus: { type: "STRING" }, 
+                            genre: { type: "STRING" },
+                            pageCount: { type: "STRING" }
+                        },
+                        required: ["fictionStatus", "genre", "pageCount"]
                     }
                 }
             };
@@ -917,7 +984,7 @@
             if (result.candidates?.[0]?.content?.parts?.[0]) {
                 return JSON.parse(result.candidates[0].content.parts[0].text);
             }
-            return { fictionStatus: 'N/A', genre: 'N/A' };
+            return { fictionStatus: 'N/A', genre: 'N/A', pageCount: 'N/A' };
         }
         
         async function fetchBookDataByIsbn(isbn) {
@@ -932,6 +999,7 @@
                         title: book.title,
                         author: book.authors ? book.authors.map(a => a.name).join(', ') : 'N/A',
                         publicationYear: book.publish_date || 'N/A',
+                        pageCount: book.number_of_pages || '',
                         olid: data[bookKey].key,
                         isbn: isbn
                     };
@@ -1188,6 +1256,10 @@
             const book = allBooks.find(b => b.id === bookId);
             if (book) {
                 galleryDetailContent.innerHTML = `
+                    <img src="${book.coverImageUrl || 'https://placehold.co/200x300/e2e8f0/94a3b8?text=No+Image'}" 
+                         alt="Cover of ${book.title}" 
+                         class="h-48 mx-auto mb-4 rounded-md shadow-lg"
+                         onerror="this.onerror=null;this.src='https://placehold.co/200x300/e2e8f0/94a3b8?text=Error';">
                     <h3 class="text-xl font-bold">${book.title}</h3>
                     <p class="text-md text-gray-700">${book.author}</p>
                     <p class="text-sm text-gray-500 mt-2">Read: ${book.monthRead} ${book.yearRead}</p>
