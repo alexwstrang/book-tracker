@@ -133,14 +133,17 @@
 
     <div class="container mx-auto p-4 sm:p-6 lg:p-8 max-w-7xl">
         <header class="text-center mb-6">
-            <h1 class="text-3xl sm:text-4xl font-bold text-gray-900">AI Book Tracker v2.8</h1>
+            <h1 class="text-3xl sm:text-4xl font-bold text-gray-900">AI Book Tracker v2.9</h1>
             <p class="text-md text-gray-600 mt-2">Your personal reading history from 2014 to present.</p>
         </header>
 
         <div class="mb-6 flex justify-between items-center border-b border-gray-200">
             <nav class="-mb-px flex flex-wrap gap-x-2 gap-y-2" aria-label="Tabs" id="year-tabs">
             </nav>
-            <button id="view-stats-btn" class="px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700">View Stats</button>
+            <div class="space-x-2">
+                <button id="view-toggle-btn" class="px-4 py-2 border border-transparent text-sm font-medium rounded-md text-indigo-700 bg-indigo-100 hover:bg-indigo-200">Switch to Gallery View</button>
+                <button id="view-stats-btn" class="px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700">View Stats</button>
+            </div>
         </div>
 
         <div id="main-content" class="bg-white p-4 sm:p-6 rounded-xl shadow-lg">
@@ -187,13 +190,13 @@
                 <div id="error-message" class="text-red-500 text-sm mt-2 hidden"></div>
             </div>
 
-            <div>
+            <div id="list-view">
                 <h3 class="text-lg font-semibold mb-4">Books Read in <span id="current-year-table-label"></span></h3>
                 <div class="book-list-container overflow-x-auto max-h-[60vh] overflow-y-auto">
                     <table class="min-w-full divide-y divide-gray-200">
                         <thead class="bg-gray-50 sticky top-0">
                             <tr>
-                                <th scope="col" class="px-2 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"></th>
+                                <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">#</th>
                                 <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cover</th>
                                 <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Title</th>
                                 <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Author</th>
@@ -211,6 +214,11 @@
                 <div id="no-books-message" class="text-center py-10 text-gray-500">
                     <p>No books added for this year yet. Use the form above to add your first book!</p>
                 </div>
+            </div>
+            
+            <div id="gallery-view" class="hidden">
+                 <h3 class="text-lg font-semibold mb-4">Cover Gallery</h3>
+                 <div id="gallery-container" class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-4"></div>
             </div>
         </div>
         <footer class="text-center mt-6 text-sm text-gray-500">
@@ -299,6 +307,7 @@
         let sortableInstance = null; 
         let fictionChart, genreChart;
         let allUserGenres = [];
+        let allBooks = [];
         let currentEditingBookId = null;
         
         const firebaseConfig = {
@@ -346,6 +355,10 @@
         const imageModal = document.getElementById('image-modal');
         const fullImage = document.getElementById('full-image');
         const closeImageModalBtn = document.getElementById('close-image-modal');
+        const viewToggleBtn = document.getElementById('view-toggle-btn');
+        const listView = document.getElementById('list-view');
+        const galleryView = document.getElementById('gallery-view');
+        const galleryContainer = document.getElementById('gallery-container');
 
         async function initializeFirebase() {
             try {
@@ -358,7 +371,6 @@
                     if (user) {
                         userId = user.uid;
                         document.getElementById('user-id-display').textContent = userId;
-                        await fetchAllUserGenres();
                         initializeAppUI();
                     } else {
                         try {
@@ -378,7 +390,7 @@
         function initializeAppUI() {
             if (!userId) return;
             setupTabs();
-            updateActiveTab();
+            listenForAllBooks();
             addRowBtn.addEventListener('click', () => addBulkRow());
             bulkAddForm.addEventListener('submit', handleBulkAdd);
             addBulkRow(); 
@@ -403,6 +415,7 @@
             imageModal.addEventListener('click', (e) => {
                 if (e.target === imageModal) closeImageModal();
             });
+            viewToggleBtn.addEventListener('click', toggleView);
         }
 
         function addBulkRow(book = { title: '', author: '', month: '', publicationYear: '', olid: '', isbn: '' }) {
@@ -457,34 +470,38 @@
             yearTabsContainer.innerHTML = '';
             const endYear = new Date().getFullYear();
             for (let year = endYear; year >= 2014; year--) {
-                const tab = document.createElement('a');
-                tab.href = '#';
-                tab.dataset.year = year;
-                tab.className = 'whitespace-nowrap py-3 px-4 border-b-2 font-medium text-sm rounded-t-lg hover:bg-indigo-50';
-                tab.textContent = year;
-                if (year === currentYear) {
-                    tab.classList.add('tab-active');
-                }
-                tab.addEventListener('click', (e) => {
+                const tab = document.createElement('div');
+                tab.className = 'flex items-center';
+                tab.innerHTML = `
+                    <input type="checkbox" id="year-check-${year}" data-year="${year}" class="h-4 w-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500 hidden year-checkbox">
+                    <a href="#" data-year="${year}" class="whitespace-nowrap py-3 px-4 border-b-2 font-medium text-sm rounded-t-lg hover:bg-indigo-50">${year}</a>
+                `;
+                yearTabsContainer.appendChild(tab);
+                
+                tab.querySelector('a').addEventListener('click', (e) => {
                     e.preventDefault();
                     currentYear = parseInt(e.target.dataset.year);
                     updateActiveTab();
                 });
-                yearTabsContainer.appendChild(tab);
+                tab.querySelector('input').addEventListener('change', renderCurrentView);
             }
         }
 
         function updateActiveTab() {
             document.querySelectorAll('#year-tabs a').forEach(tab => {
-                if (parseInt(tab.dataset.year) === currentYear) {
-                    tab.classList.add('tab-active');
-                } else {
-                    tab.classList.remove('tab-active');
-                }
+                tab.classList.toggle('tab-active', parseInt(tab.dataset.year) === currentYear);
             });
             document.getElementById('current-year-label').textContent = currentYear;
-            document.getElementById('current-year-table-label').textContent = currentYear;
-            fetchAndRenderBooks();
+            renderCurrentView();
+        }
+
+        function renderCurrentView() {
+            if (galleryView.classList.contains('hidden')) {
+                const booksForYear = allBooks.filter(b => b.yearRead === currentYear);
+                renderBooks(booksForYear);
+            } else {
+                renderGalleryView();
+            }
         }
 
         function renderBooks(books) {
@@ -496,16 +513,12 @@
                 noBooksMessage.classList.add('hidden');
                 bookList.classList.remove('hidden');
 
-                books.forEach(book => {
+                books.forEach((book, index) => {
                     const row = document.createElement('tr');
                     row.id = book.id; 
                     const needsReview = book.fictionStatus === 'N/A' || book.genre === 'N/A';
                     row.innerHTML = `
-                        <td class="px-2 py-4 whitespace-nowrap text-gray-400 text-center drag-handle">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" class="inline-block" viewBox="0 0 16 16">
-                              <path d="M7 5a1 1 0 1 1-2 0 1 1 0 0 1 2 0zm-1 3a1 1 0 1 0 0 2 1 1 0 0 0 0-2zm-1 4a1 1 0 1 1-2 0 1 1 0 0 1 2 0zm5-7a1 1 0 1 1-2 0 1 1 0 0 1 2 0zM10 8a1 1 0 1 0 0 2 1 1 0 0 0 0-2zm-1 4a1 1 0 1 1-2 0 1 1 0 0 1 2 0z"/>
-                            </svg>
-                        </td>
+                        <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-500">${index + 1}</td>
                          <td class="px-6 py-4 whitespace-nowrap">
                              <img src="${book.coverImageUrl || 'https://placehold.co/80x120/e2e8f0/94a3b8?text=No+Image'}" 
                                  alt="Cover of ${book.title}" 
@@ -558,11 +571,7 @@
 
                 document.querySelectorAll('.thumbnail-img').forEach(img => {
                     img.addEventListener('click', (e) => {
-                        if (e.target.src.includes('placehold.co')) {
-                             handleEditArtwork(e.target.dataset.id);
-                        } else {
-                            openImageModal(e.target.src)
-                        }
+                        handleEditArtwork(e.target.dataset.id);
                     });
                 });
 
@@ -594,19 +603,14 @@
             }
         }
 
-        function fetchAndRenderBooks() {
-            if (unsubscribeFromFirestore) unsubscribeFromFirestore();
+        function listenForAllBooks() {
             if (!db || !userId) return;
-            
             const booksCollectionRef = collection(db, `users/${userId}/books`);
-            const q = query(booksCollectionRef, where("yearRead", "==", currentYear), orderBy("order", "asc"));
-
-            unsubscribeFromFirestore = onSnapshot(q, (querySnapshot) => {
-                const books = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                renderBooks(books);
-            }, (error) => {
-                console.error("Error fetching books:", error);
-                showError("Could not fetch your book list. Please check your connection or refresh.");
+            const q = query(booksCollectionRef, orderBy("order", "asc"));
+            onSnapshot(q, (querySnapshot) => {
+                allBooks = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                fetchAllUserGenres();
+                renderCurrentView();
             });
         }
 
@@ -655,7 +659,7 @@
 
             const batch = writeBatch(db);
             const booksCollectionRef = collection(db, `users/${userId}/books`);
-            let currentOrder = bookList.children.length;
+            let currentOrder = allBooks.length;
             
             booksToAdd.forEach(book => {
                 const newBookRef = doc(booksCollectionRef);
@@ -664,7 +668,6 @@
 
             try {
                 await batch.commit();
-                await fetchAllUserGenres();
                 bulkBookRows.innerHTML = '';
                 addBulkRow();
                 hideError();
@@ -680,7 +683,6 @@
             if (confirm('Are you sure you want to delete this book?')) {
                  try {
                     await deleteDoc(doc(db, `users/${userId}/books`, bookId));
-                    await fetchAllUserGenres();
                 } catch (error) {
                     console.error("Error deleting book:", error);
                     showError("Failed to delete the book. Please try again.");
@@ -719,10 +721,7 @@
             statsYearBtn.classList.toggle('bg-gray-100', scope !== 'year');
             statsAllBtn.classList.toggle('bg-gray-100', scope !== 'all');
 
-            const booksCollectionRef = collection(db, `users/${userId}/books`);
-            const q = scope === 'year' ? query(booksCollectionRef, where("yearRead", "==", currentYear)) : query(booksCollectionRef);
-            const querySnapshot = await getDocs(q);
-            const books = querySnapshot.docs.map(doc => doc.data());
+            const books = scope === 'year' ? allBooks.filter(b => b.yearRead === currentYear) : allBooks;
 
             const totalBooks = books.length;
             const authors = books.map(b => b.author);
