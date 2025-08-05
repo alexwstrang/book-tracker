@@ -144,7 +144,7 @@
 
     <div class="container mx-auto p-4 sm:p-6 lg:p-8 max-w-7xl">
         <header class="text-center mb-6">
-            <h1 class="text-3xl sm:text-4xl font-bold text-gray-900">AI Book Tracker v3.6</h1>
+            <h1 class="text-3xl sm:text-4xl font-bold text-gray-900">AI Book Tracker v3.7</h1>
             <p class="text-md text-gray-600 mt-2">Your personal reading history from 2014 to present.</p>
         </header>
 
@@ -878,7 +878,6 @@
             const suggestionsContainer = row.querySelector('.title-suggestions');
             const titleInput = row.querySelector('.bulk-title');
             const authorInput = row.querySelector('.bulk-author');
-            const pagesInput = row.querySelector('.bulk-pages');
             suggestionsContainer.innerHTML = '';
 
             if (suggestions.length > 0) {
@@ -929,7 +928,7 @@
                             publicationYear: book.publicationYear,
                             fictionStatus: bookData.fictionStatus,
                             genre: bookData.genre,
-                            pageCount: book.pageCount,
+                            coverImageUrl: book.isbn ? `https://covers.openlibrary.org/b/isbn/${book.isbn}-L.jpg` : '',
                             olid: book.olid
                         });
                         reviewModal.style.display = 'none';
@@ -969,7 +968,6 @@
                     title: doc.title,
                     author: doc.author_name ? doc.author_name.join(', ') : 'N/A',
                     publicationYear: doc.first_publish_year || 'N/A',
-                    pageCount: doc.number_of_pages_median || '',
                     olid: doc.key,
                     isbn: doc.isbn ? doc.isbn[0] : null
                 }));
@@ -987,10 +985,7 @@
                     responseMimeType: "application/json",
                     responseSchema: {
                         type: "OBJECT",
-                        properties: { 
-                            fictionStatus: { type: "STRING" }, 
-                            genre: { type: "STRING" }
-                        },
+                        properties: { fictionStatus: { type: "STRING" }, genre: { type: "STRING" } },
                         required: ["fictionStatus", "genre"]
                     }
                 }
@@ -1018,7 +1013,6 @@
                         title: book.title,
                         author: book.authors ? book.authors.map(a => a.name).join(', ') : 'N/A',
                         publicationYear: book.publish_date || 'N/A',
-                        pageCount: book.number_of_pages || '',
                         olid: data[bookKey].key,
                         isbn: isbn
                     };
@@ -1238,7 +1232,7 @@
             const isGallery = galleryView.classList.toggle('hidden');
             listView.classList.toggle('hidden');
             document.querySelectorAll('.year-checkbox').forEach(cb => cb.classList.toggle('hidden'));
-            viewToggleBtn.textContent = isGallery ? 'Switch to Gallery View' : 'Switch to List View';
+            viewToggleBtn.textContent = isGallery ? 'Switch to List View' : 'Switch to Gallery View';
             renderCurrentView();
         }
 
