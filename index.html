@@ -115,7 +115,7 @@
 
     <div class="container mx-auto p-4 sm:p-6 lg:p-8 max-w-7xl">
         <header class="text-center mb-6">
-            <h1 class="text-3xl sm:text-4xl font-bold text-gray-900">AI Book Tracker v1.9</h1>
+            <h1 class="text-3xl sm:text-4xl font-bold text-gray-900">AI Book Tracker v2.0</h1>
             <p class="text-md text-gray-600 mt-2">Your personal reading history from 2014 to present.</p>
         </header>
 
@@ -823,6 +823,24 @@
         }
         
         async function fetchBookDataByIsbn(isbn) {
+            // First, try the reliable Open Library API
+            try {
+                const response = await fetch(`https://openlibrary.org/api/books?bibkeys=ISBN:${isbn}&format=json&jscmd=data`);
+                const data = await response.json();
+                const bookKey = `ISBN:${isbn}`;
+                if (data[bookKey]) {
+                    const book = data[bookKey];
+                    return {
+                        title: book.title,
+                        author: book.authors.map(a => a.name).join(', '),
+                        publicationYear: book.publish_date || 'N/A'
+                    };
+                }
+            } catch (error) {
+                console.error("Open Library API failed, falling back to AI.", error);
+            }
+
+            // Fallback to AI if Open Library fails
             const prompt = `Based on the ISBN "${isbn}", find the book's full title, author, and original publication year.`;
             const payload = {
                 contents: [{ role: "user", parts: [{ text: prompt }] }],
@@ -851,7 +869,7 @@
             if (!isbn) return;
             try {
                 const bookData = await fetchBookDataByIsbn(isbn);
-                if (bookData) {
+                if (bookData && bookData.title) {
                     addBulkRow(bookData);
                     isbnInput.value = '';
                 } else {
