@@ -133,7 +133,7 @@
 
     <div class="container mx-auto p-4 sm:p-6 lg:p-8 max-w-7xl">
         <header class="text-center mb-6">
-            <h1 class="text-3xl sm:text-4xl font-bold text-gray-900">AI Book Tracker v2.9</h1>
+            <h1 class="text-3xl sm:text-4xl font-bold text-gray-900">AI Book Tracker v3.0</h1>
             <p class="text-md text-gray-600 mt-2">Your personal reading history from 2014 to present.</p>
         </header>
 
@@ -1131,6 +1131,40 @@
 
         function closeImageModal() {
             imageModal.style.display = "none";
+        }
+        
+        function toggleView() {
+            const isGallery = galleryView.classList.toggle('hidden');
+            listView.classList.toggle('hidden');
+            document.querySelectorAll('.year-checkbox').forEach(cb => cb.classList.toggle('hidden'));
+            viewToggleBtn.textContent = isGallery ? 'Switch to Gallery View' : 'Switch to List View';
+            renderCurrentView();
+        }
+
+        function renderGalleryView() {
+            const selectedYears = Array.from(document.querySelectorAll('.year-checkbox:checked')).map(cb => parseInt(cb.dataset.year));
+            if (selectedYears.length === 0) {
+                selectedYears.push(currentYear); // Default to current year if none selected
+                const currentYearCheckbox = document.getElementById(`year-check-${currentYear}`);
+                if (currentYearCheckbox) currentYearCheckbox.checked = true;
+            }
+
+            const booksToShow = allBooks.filter(book => selectedYears.includes(book.yearRead));
+            galleryContainer.innerHTML = '';
+            if (booksToShow.length > 0) {
+                booksToShow.forEach(book => {
+                    const div = document.createElement('div');
+                    div.innerHTML = `
+                        <img src="${book.coverImageUrl || 'https://placehold.co/200x300/e2e8f0/94a3b8?text=No+Image'}" 
+                             alt="Cover of ${book.title}" 
+                             class="h-48 w-full object-cover rounded-md shadow-lg"
+                             onerror="this.onerror=null;this.src='https://placehold.co/200x300/e2e8f0/94a3b8?text=Error';">
+                    `;
+                    galleryContainer.appendChild(div);
+                });
+            } else {
+                galleryContainer.innerHTML = '<p class="col-span-full text-center text-gray-500">No books to display for the selected year(s).</p>';
+            }
         }
 
 
