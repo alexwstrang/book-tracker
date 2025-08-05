@@ -115,7 +115,7 @@
 
     <div class="container mx-auto p-4 sm:p-6 lg:p-8 max-w-7xl">
         <header class="text-center mb-6">
-            <h1 class="text-3xl sm:text-4xl font-bold text-gray-900">AI Book Tracker v1.8</h1>
+            <h1 class="text-3xl sm:text-4xl font-bold text-gray-900">AI Book Tracker v1.9</h1>
             <p class="text-md text-gray-600 mt-2">Your personal reading history from 2014 to present.</p>
         </header>
 
@@ -129,10 +129,14 @@
             <div class="mb-6 pb-6 border-b border-gray-200">
                 <h2 class="text-xl font-semibold mb-3">Add Books to <span id="current-year-label"></span></h2>
                 
-                <div class="mb-6 p-4 bg-gray-50 rounded-lg grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div class="mb-4">
+                    <a href="#" id="toggle-import-btn" class="text-sm text-indigo-600 hover:underline">Show Import Options</a>
+                </div>
+
+                <div id="import-section" class="hidden mb-6 p-4 bg-gray-50 rounded-lg grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
                         <h3 class="font-semibold mb-2">Import from CSV</h3>
-                        <p class="text-sm text-gray-600 mb-2">Upload a CSV file with columns: Title, Author, Month. <a href="#" id="download-template-link" class="text-indigo-600 hover:underline">Download template</a></p>
+                        <p class="text-sm text-gray-600 mb-2">Upload a CSV with Title/Author or ISBN. <a href="#" id="download-template-link" class="text-indigo-600 hover:underline">Download Title/Author template</a> or <a href="#" id="download-isbn-template-link" class="text-indigo-600 hover:underline">ISBN template</a>.</p>
                         <input type="file" id="csv-file-input" accept=".csv" class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100"/>
                     </div>
                      <div>
@@ -288,11 +292,14 @@
         const statsAllBtn = document.getElementById('stats-all-btn');
         const csvFileInput = document.getElementById('csv-file-input');
         const downloadTemplateLink = document.getElementById('download-template-link');
+        const downloadIsbnTemplateLink = document.getElementById('download-isbn-template-link');
         const reviewModal = document.getElementById('review-modal');
         const closeReviewModalBtn = document.getElementById('close-review-modal');
         const reviewSuggestionsContainer = document.getElementById('review-suggestions');
         const isbnInput = document.getElementById('isbn-input');
         const findByIsbnBtn = document.getElementById('find-by-isbn-btn');
+        const toggleImportBtn = document.getElementById('toggle-import-btn');
+        const importSection = document.getElementById('import-section');
 
         async function initializeFirebase() {
             try {
@@ -334,9 +341,15 @@
             statsYearBtn.addEventListener('click', () => generateStats('year'));
             statsAllBtn.addEventListener('click', () => generateStats('all'));
             csvFileInput.addEventListener('change', handleCsvUpload);
-            downloadTemplateLink.addEventListener('click', downloadCsvTemplate);
+            downloadTemplateLink.addEventListener('click', (e) => downloadCsvTemplate(e, 'title'));
+            downloadIsbnTemplateLink.addEventListener('click', (e) => downloadCsvTemplate(e, 'isbn'));
             closeReviewModalBtn.addEventListener('click', () => reviewModal.style.display = 'none');
             findByIsbnBtn.addEventListener('click', handleIsbnSearch);
+            toggleImportBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                importSection.classList.toggle('hidden');
+                e.target.textContent = importSection.classList.contains('hidden') ? 'Show Import Options' : 'Hide Import Options';
+            });
         }
 
         function addBulkRow(book = { title: '', author: '', month: '', publicationYear: '' }) {
@@ -891,15 +904,25 @@
             errorMessage.classList.add('hidden');
         }
         
-        function downloadCsvTemplate(e) {
+        function downloadCsvTemplate(e, type) {
             e.preventDefault();
-            const csvContent = "data:text/csv;charset=utf-8," 
-                + "Title,Author,Month\n"
-                + "\"The Hobbit\",\"J.R.R. Tolkien\",January\n";
+            let csvContent, fileName;
+            if (type === 'isbn') {
+                csvContent = "data:text/csv;charset=utf-8," 
+                    + "ISBN,Month\n"
+                    + "9780345391803,January\n";
+                fileName = "book_template_isbn.csv";
+            } else {
+                csvContent = "data:text/csv;charset=utf-8," 
+                    + "Title,Author,Month\n"
+                    + "\"The Hobbit\",\"J.R.R. Tolkien\",January\n";
+                fileName = "book_template_title.csv";
+            }
+            
             const encodedUri = encodeURI(csvContent);
             const link = document.createElement("a");
             link.setAttribute("href", encodedUri);
-            link.setAttribute("download", "book_template.csv");
+            link.setAttribute("download", fileName);
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
@@ -910,26 +933,48 @@
             if (!file) return;
 
             const reader = new FileReader();
-            reader.onload = function(e) {
+            reader.onload = async function(e) {
                 const text = e.target.result;
-                const rows = text.split('\n').slice(1).filter(row => row.trim() !== '');
-                
+                const rows = text.split('\n').filter(row => row.trim() !== '');
+                const header = rows.shift().toLowerCase();
+
                 bulkBookRows.innerHTML = '';
 
-                rows.forEach(rowStr => {
-                    const columns = rowStr.match(/(".*?"|[^",]+)(?=\s*,|\s*$)/g) || [];
-                    if (columns.length >= 3) {
-                        const book = {
-                            title: columns[0].replace(/"/g, '').trim(),
-                            author: columns[1].replace(/"/g, '').trim(),
-                            month: columns[2].replace(/"/g, '').trim()
-                        };
-                        if (book.title && book.author && book.month) {
-                            addBulkRow(book);
+                if (header.includes('isbn')) {
+                    for (const rowStr of rows) {
+                        const columns = rowStr.split(',');
+                        if (columns.length >= 2) {
+                            const isbn = columns[0].replace(/"/g, '').trim();
+                            const month = columns[1].replace(/"/g, '').trim();
+                            if (isbn && month) {
+                                try {
+                                    const bookData = await fetchBookDataByIsbn(isbn);
+                                    if (bookData) {
+                                        addBulkRow({ ...bookData, month });
+                                    }
+                                } catch (error) {
+                                    console.error(`Failed to find book for ISBN ${isbn}`);
+                                }
+                            }
                         }
                     }
-                });
-                if (rows.length === 0 || bulkBookRows.children.length === 0) {
+                } else {
+                    rows.forEach(rowStr => {
+                        const columns = rowStr.match(/(".*?"|[^",]+)(?=\s*,|\s*$)/g) || [];
+                        if (columns.length >= 3) {
+                            const book = {
+                                title: columns[0].replace(/"/g, '').trim(),
+                                author: columns[1].replace(/"/g, '').trim(),
+                                month: columns[2].replace(/"/g, '').trim()
+                            };
+                            if (book.title && book.author && book.month) {
+                                addBulkRow(book);
+                            }
+                        }
+                    });
+                }
+                
+                if (bulkBookRows.children.length === 0) {
                     addBulkRow();
                 }
             };
