@@ -133,7 +133,7 @@
 
     <div class="container mx-auto p-4 sm:p-6 lg:p-8 max-w-7xl">
         <header class="text-center mb-6">
-            <h1 class="text-3xl sm:text-4xl font-bold text-gray-900">AI Book Tracker v2.4</h1>
+            <h1 class="text-3xl sm:text-4xl font-bold text-gray-900">AI Book Tracker v2.5</h1>
             <p class="text-md text-gray-600 mt-2">Your personal reading history from 2014 to present.</p>
         </header>
 
@@ -269,6 +269,16 @@
         </div>
     </div>
     
+    <!-- Artwork Modal -->
+    <div id="artwork-modal" class="modal">
+        <div class="bg-white rounded-lg shadow-xl m-4 sm:m-8 max-w-2xl w-full mx-auto my-auto p-6 relative">
+             <button id="close-artwork-modal" class="absolute top-4 right-4 text-gray-500 hover:text-gray-800 text-3xl font-bold">&times;</button>
+             <h2 class="text-2xl font-bold mb-2">Choose Artwork</h2>
+             <p class="text-sm text-gray-600 mb-4">Select the correct cover for this book.</p>
+             <div id="artwork-suggestions" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4"></div>
+        </div>
+    </div>
+    
     <div id="genre-suggestions-container" class="suggestions-container hidden"></div>
     
     <div id="image-modal" class="modal">
@@ -322,6 +332,9 @@
         const reviewModal = document.getElementById('review-modal');
         const closeReviewModalBtn = document.getElementById('close-review-modal');
         const reviewSuggestionsContainer = document.getElementById('review-suggestions');
+        const artworkModal = document.getElementById('artwork-modal');
+        const closeArtworkModalBtn = document.getElementById('close-artwork-modal');
+        const artworkSuggestionsContainer = document.getElementById('artwork-suggestions');
         const isbnInput = document.getElementById('isbn-input');
         const findByIsbnBtn = document.getElementById('find-by-isbn-btn');
         const toggleImportBtn = document.getElementById('toggle-import-btn');
@@ -375,6 +388,7 @@
             downloadTemplateLink.addEventListener('click', (e) => downloadCsvTemplate(e, 'title'));
             downloadIsbnTemplateLink.addEventListener('click', (e) => downloadCsvTemplate(e, 'isbn'));
             closeReviewModalBtn.addEventListener('click', () => reviewModal.style.display = 'none');
+            closeArtworkModalBtn.addEventListener('click', () => artworkModal.style.display = 'none');
             findByIsbnBtn.addEventListener('click', handleIsbnSearch);
             toggleImportBtn.addEventListener('click', (e) => {
                 e.preventDefault();
@@ -519,7 +533,7 @@
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">
                             ${needsReview ? `<button data-id="${book.id}" data-title="${book.title}" data-author="${book.author}" class="text-yellow-600 hover:text-yellow-900 review-btn">Review</button>` : ''}
-                            ${!hasArtwork ? `<button data-id="${book.id}" data-title="${book.title}" data-author="${book.author}" class="text-blue-600 hover:text-blue-900 artwork-btn">Get Art</button>` : ''}
+                            ${!hasArtwork ? `<button data-id="${book.id}" data-olid="${book.olid || ''}" data-title="${book.title}" data-author="${book.author}" class="text-blue-600 hover:text-blue-900 artwork-btn">Get Art</button>` : ''}
                             <button data-id="${book.id}" class="text-red-600 hover:text-red-900 delete-btn">Delete</button>
                         </td>
                     `;
@@ -542,8 +556,8 @@
 
                 document.querySelectorAll('.artwork-btn').forEach(button => {
                     button.addEventListener('click', (e) => {
-                        const { id, title, author } = e.target.closest('button').dataset;
-                        handleGetArtwork(id, title, author);
+                        const { id, title, author, olid } = e.target.closest('button').dataset;
+                        handleGetArtwork(id, title, author, olid);
                     });
                 });
 
@@ -626,11 +640,12 @@
                             fictionStatus: bookData.fictionStatus || 'N/A',
                             genre: bookData.genre || 'N/A',
                             coverImageUrl: isbn ? `https://covers.openlibrary.org/b/isbn/${isbn}-L.jpg` : '',
+                            olid: olid,
                             createdAt: new Date()
                         });
                     } catch (error) {
                         console.error(`Failed to fetch data for ${title}:`, error);
-                        booksToAdd.push({ title, author, monthRead, yearRead: currentYear, publicationYear, fictionStatus: 'N/A', genre: 'N/A', coverImageUrl: '' });
+                        booksToAdd.push({ title, author, monthRead, yearRead: currentYear, publicationYear, fictionStatus: 'N/A', genre: 'N/A', coverImageUrl: '', olid: null });
                     }
                 }
                 processedCount++;
@@ -818,7 +833,8 @@
                             publicationYear: book.publicationYear,
                             fictionStatus: bookData.fictionStatus,
                             genre: bookData.genre,
-                            coverImageUrl: book.isbn ? `https://covers.openlibrary.org/b/isbn/${book.isbn}-L.jpg` : ''
+                            coverImageUrl: book.isbn ? `https://covers.openlibrary.org/b/isbn/${book.isbn}-L.jpg` : '',
+                            olid: book.olid
                         });
                         reviewModal.style.display = 'none';
                     };
@@ -830,14 +846,33 @@
             }
         }
 
-        async function handleGetArtwork(bookId, title, author) {
+        async function handleGetArtwork(bookId, title, author, olid) {
+            artworkModal.style.display = 'flex';
+            artworkSuggestionsContainer.innerHTML = '<p>Searching for artwork...</p>';
             const suggestions = await fetchBookSuggestions(title);
-            const match = suggestions.find(s => s.author.includes(author));
-            if (match && match.isbn) {
-                const coverImageUrl = `https://covers.openlibrary.org/b/isbn/${match.isbn}-L.jpg`;
-                await updateDoc(doc(db, `users/${userId}/books`, bookId), { coverImageUrl });
-            } else {
-                showError("Could not find artwork for this book.");
+            artworkSuggestionsContainer.innerHTML = '';
+
+            if (suggestions.length > 0) {
+                suggestions.forEach(book => {
+                    if (book.isbn) {
+                        const div = document.createElement('div');
+                        div.className = 'suggestion-item text-center';
+                        div.innerHTML = `
+                            <img src="https://covers.openlibrary.org/b/isbn/${book.isbn}-M.jpg" class="h-40 mx-auto mb-2 rounded-md shadow-sm"/>
+                            <button class="px-2 py-1 bg-indigo-100 text-indigo-700 text-xs font-semibold rounded-full">Select</button>
+                        `;
+                        div.querySelector('button').onclick = async () => {
+                            const coverImageUrl = `https://covers.openlibrary.org/b/isbn/${book.isbn}-L.jpg`;
+                             await updateDoc(doc(db, `users/${userId}/books`, bookId), { coverImageUrl, olid: book.olid });
+                            artworkModal.style.display = 'none';
+                        };
+                        artworkSuggestionsContainer.appendChild(div);
+                    }
+                });
+            } 
+            
+            if (artworkSuggestionsContainer.children.length === 0) {
+                artworkSuggestionsContainer.innerHTML = '<p>No artwork found for this book.</p>';
             }
         }
 
