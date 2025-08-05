@@ -144,7 +144,7 @@
 
     <div class="container mx-auto p-4 sm:p-6 lg:p-8 max-w-7xl">
         <header class="text-center mb-6">
-            <h1 class="text-3xl sm:text-4xl font-bold text-gray-900">AI Book Tracker v3.11</h1>
+            <h1 class="text-3xl sm:text-4xl font-bold text-gray-900">AI Book Tracker v3.12</h1>
             <p class="text-md text-gray-600 mt-2">Your personal reading history from 2014 to present.</p>
         </header>
 
@@ -1244,7 +1244,10 @@
                 if (currentYearCheckbox) currentYearCheckbox.checked = true;
             }
 
-            const booksToShow = allBooks.filter(book => selectedYears.includes(book.yearRead));
+            const booksToShow = allBooks
+                .filter(book => selectedYears.includes(book.yearRead))
+                .sort((a, b) => b.createdAt.toDate() - a.createdAt.toDate());
+                
             galleryContainer.innerHTML = '';
             if (booksToShow.length > 0) {
                 booksToShow.forEach(book => {
