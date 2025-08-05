@@ -144,7 +144,7 @@
 
     <div class="container mx-auto p-4 sm:p-6 lg:p-8 max-w-7xl">
         <header class="text-center mb-6">
-            <h1 class="text-3xl sm:text-4xl font-bold text-gray-900">AI Book Tracker v3.4</h1>
+            <h1 class="text-3xl sm:text-4xl font-bold text-gray-900">AI Book Tracker v3.5</h1>
             <p class="text-md text-gray-600 mt-2">Your personal reading history from 2014 to present.</p>
         </header>
 
@@ -208,10 +208,10 @@
                         <thead class="bg-gray-50 sticky top-0">
                             <tr>
                                 <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">#</th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cover</th>
                                 <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Title</th>
                                 <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Author</th>
                                 <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Month Read</th>
-                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Pages</th>
                                 <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
                                 <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Genre</th>
                                 <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Published</th>
@@ -256,22 +256,12 @@
                         <p id="stats-total-books" class="text-3xl font-bold"></p>
                     </div>
                     <div class="p-4 bg-gray-100 rounded-lg">
-                        <p class="text-sm text-gray-600">Total Pages Read</p>
-                        <p id="stats-total-pages" class="text-3xl font-bold"></p>
+                        <p class="text-sm text-gray-600">Unique Authors</p>
+                        <p id="stats-unique-authors" class="text-3xl font-bold"></p>
                     </div>
                      <div class="p-4 bg-gray-100 rounded-lg">
-                        <p class="text-sm text-gray-600">Avg. Book Length</p>
-                        <p id="stats-avg-length" class="text-3xl font-bold"></p>
-                    </div>
-                </div>
-                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6 text-center">
-                    <div class="p-4 bg-gray-100 rounded-lg">
                         <p class="text-sm text-gray-600">Most Read Author</p>
                         <p id="stats-top-author" class="text-xl font-bold truncate cursor-pointer hover:text-indigo-600"></p>
-                    </div>
-                     <div class="p-4 bg-gray-100 rounded-lg">
-                        <p class="text-sm text-gray-600">Longest Book</p>
-                        <p id="stats-longest-book" class="text-xl font-bold truncate"></p>
                     </div>
                 </div>
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
@@ -308,12 +298,22 @@
         </div>
     </div>
     
-    <!-- Author Detail Modal -->
-    <div id="author-detail-modal" class="modal">
+    <!-- Artwork URL Modal -->
+    <div id="artwork-url-modal" class="modal">
         <div class="bg-white rounded-lg shadow-xl m-4 sm:m-8 max-w-lg w-full mx-auto my-auto p-6 relative">
-             <button id="close-author-detail-modal" class="absolute top-4 right-4 text-gray-500 hover:text-gray-800 text-3xl font-bold">&times;</button>
-             <h2 id="author-detail-title" class="text-2xl font-bold mb-4"></h2>
-             <ul id="author-detail-list" class="list-disc list-inside space-y-1"></ul>
+             <button id="close-artwork-url-modal" class="absolute top-4 right-4 text-gray-500 hover:text-gray-800 text-3xl font-bold">&times;</button>
+             <h2 class="text-2xl font-bold mb-2">Edit Artwork URL</h2>
+             <p class="text-sm text-gray-600 mb-4">Paste the URL for the book cover image.</p>
+             <input type="text" id="artwork-url-input" class="w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+             <button id="save-artwork-url-btn" class="mt-4 w-full px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700">Save</button>
+        </div>
+    </div>
+    
+    <!-- Gallery Detail Modal -->
+    <div id="gallery-detail-modal" class="modal">
+        <div class="bg-white rounded-lg shadow-xl m-4 sm:m-8 max-w-md w-full mx-auto my-auto p-6 relative">
+             <button id="close-gallery-detail-modal" class="absolute top-4 right-4 text-gray-500 hover:text-gray-800 text-3xl font-bold">&times;</button>
+             <div id="gallery-detail-content" class="text-center"></div>
         </div>
     </div>
     
@@ -371,6 +371,10 @@
         const reviewModal = document.getElementById('review-modal');
         const closeReviewModalBtn = document.getElementById('close-review-modal');
         const reviewSuggestionsContainer = document.getElementById('review-suggestions');
+        const artworkUrlModal = document.getElementById('artwork-url-modal');
+        const closeArtworkUrlModalBtn = document.getElementById('close-artwork-url-modal');
+        const artworkUrlInput = document.getElementById('artwork-url-input');
+        const saveArtworkUrlBtn = document.getElementById('save-artwork-url-btn');
         const isbnInput = document.getElementById('isbn-input');
         const findByIsbnBtn = document.getElementById('find-by-isbn-btn');
         const toggleImportBtn = document.getElementById('toggle-import-btn');
@@ -434,6 +438,8 @@
             downloadTemplateLink.addEventListener('click', (e) => downloadCsvTemplate(e, 'title'));
             downloadIsbnTemplateLink.addEventListener('click', (e) => downloadCsvTemplate(e, 'isbn'));
             closeReviewModalBtn.addEventListener('click', () => reviewModal.style.display = 'none');
+            closeArtworkUrlModalBtn.addEventListener('click', () => artworkUrlModal.style.display = 'none');
+            saveArtworkUrlBtn.addEventListener('click', handleSaveArtworkUrl);
             findByIsbnBtn.addEventListener('click', handleIsbnSearch);
             toggleImportBtn.addEventListener('click', (e) => {
                 e.preventDefault();
@@ -664,7 +670,6 @@
                 const publicationYear = row.dataset.publicationYear || 'N/A';
                 const pageCount = row.querySelector('.bulk-pages').value.trim() || 'N/A';
                 const olid = row.dataset.olid || null;
-                const isbn = row.dataset.isbn || null;
 
                 if (title && author && monthRead) {
                     try {
