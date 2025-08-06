@@ -1244,10 +1244,7 @@
                 if (currentYearCheckbox) currentYearCheckbox.checked = true;
             }
 
-            const booksToShow = allBooks
-                .filter(book => selectedYears.includes(book.yearRead))
-                .sort((a, b) => b.createdAt.toDate() - a.createdAt.toDate());
-                
+            const booksToShow = allBooks.filter(book => selectedYears.includes(book.yearRead));
             galleryContainer.innerHTML = '';
             if (booksToShow.length > 0) {
                 booksToShow.forEach(book => {
