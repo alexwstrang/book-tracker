@@ -327,7 +327,8 @@
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signOut, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        // Import signInWithRedirect
+        import { getAuth, onAuthStateChanged, GoogleAuthProvider, signInWithRedirect, signOut, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, onSnapshot, query, where, doc, deleteDoc, setLogLevel, orderBy, writeBatch, updateDoc, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         let currentYear = new Date().getFullYear();
@@ -342,8 +343,8 @@
         
         const firebaseConfig = {
             apiKey: "AIzaSyCP1bHz8yFWHgFRrMKlmRY3BcC8JDVorR8",
-            // Using your app's domain for authDomain is a best practice for custom-hosted sites.
-            authDomain: "alexwstrang.github.io",
+            // Reverted authDomain to the correct Firebase default
+            authDomain: "book-tracker-4987d.firebaseapp.com",
             projectId: "book-tracker-4987d",
             storageBucket: "book-tracker-4987d.appspot.com",
             messagingSenderId: "236216243093",
@@ -492,14 +493,12 @@
             }
         }
         
+        // Updated to use signInWithRedirect
         async function signInWithGoogle() {
             const provider = new GoogleAuthProvider();
-            try {
-                await signInWithPopup(auth, provider);
-            } catch (error) {
-                console.error("Sign in failed:", error);
-                showError("Could not sign in with Google. Please try again.");
-            }
+            // This will navigate the user away and then back. 
+            // The result is handled by the onAuthStateChanged listener when the page reloads.
+            signInWithRedirect(auth, provider);
         }
         
         async function migrateAnonymousData(anonUid, permanentUid) {
@@ -1363,8 +1362,3 @@
     </script>
 </body>
 </html>
-```
-
-I've updated the `authDomain` in your `firebaseConfig`. Please save these changes, wait a minute for your GitHub Pages site to update, and then test it one more time in a **fresh incognito window**.
-
-If this doesn't work, we may be looking at a truly unique issue with the project itself, and the next step would be to consider creating a new Firebase project to see if the issue can be replicated. I sincerely hope this change resolves 
