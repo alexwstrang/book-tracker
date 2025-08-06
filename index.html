@@ -144,7 +144,7 @@
 
     <div class="container mx-auto p-4 sm:p-6 lg:p-8 max-w-7xl">
         <header class="text-center mb-6 relative">
-            <h1 class="text-3xl sm:text-4xl font-bold text-gray-900">AI Book Tracker v3.19</h1>
+            <h1 class="text-3xl sm:text-4xl font-bold text-gray-900">AI Book Tracker v3.20</h1>
             <p class="text-md text-gray-600 mt-2">Your personal reading history from 2014 to present.</p>
             <div id="auth-container" class="absolute top-0 right-0"></div>
         </header>
@@ -470,7 +470,6 @@
                     if (user) {
                         userId = user.uid;
                         if (!user.isAnonymous && localAnonymousUid && localAnonymousUid !== userId) {
-                            // This part is now handled by linkWithCredential, but we keep it as a fallback
                             await migrateAnonymousData(localAnonymousUid, userId);
                             localStorage.removeItem('anonymousUid');
                             localAnonymousUid = null;
@@ -572,10 +571,11 @@
             try {
                 const credential = EmailAuthProvider.credential(email, password);
                 // Link the anonymous account with the new email/password credential
-                await linkWithCredential(currentUser, credential);
+                const userCredential = await linkWithCredential(currentUser, credential);
                 emailSignupModal.style.display = 'none';
                 e.target.reset(); // Clear form
-                // onAuthStateChanged will handle the UI update
+                // Manually re-render the auth UI immediately for a better user experience
+                renderAuthUI(userCredential.user);
             } catch (error) {
                 console.error("Sign up and link failed:", error);
                 showError(`Could not create account: ${error.message}`);
@@ -607,6 +607,7 @@
 
             const permanentBooksRef = collection(db, `users/${permanentUid}/books`);
             const batch = writeBatch(db);
+            // FIX: Rename loop variable to avoid shadowing the imported 'doc' function
             snapshot.docs.forEach(bookDoc => {
                 const newDocRef = doc(permanentBooksRef, bookDoc.id);
                 batch.set(newDocRef, bookDoc.data());
