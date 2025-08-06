@@ -143,9 +143,10 @@
 <body class="bg-gray-100 text-gray-800">
 
     <div class="container mx-auto p-4 sm:p-6 lg:p-8 max-w-7xl">
-        <header class="text-center mb-6">
-            <h1 class="text-3xl sm:text-4xl font-bold text-gray-900">AI Book Tracker v3.14</h1>
+        <header class="text-center mb-6 relative">
+            <h1 class="text-3xl sm:text-4xl font-bold text-gray-900">AI Book Tracker v3.16</h1>
             <p class="text-md text-gray-600 mt-2">Your personal reading history from 2014 to present.</p>
+            <div id="auth-container" class="absolute top-0 right-0"></div>
         </header>
 
         <div class="mb-6 flex justify-between items-start border-b border-gray-200">
@@ -234,7 +235,6 @@
         </div>
         <footer class="text-center mt-6 text-sm text-gray-500">
             <p>Powered by Gemini AI. Your data is saved securely.</p>
-            <p class="mt-1">User ID: <span id="user-id-display" class="font-mono"></span></p>
         </footer>
     </div>
 
@@ -327,7 +327,7 @@
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, onSnapshot, query, where, doc, deleteDoc, setLogLevel, orderBy, writeBatch, updateDoc, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         let currentYear = new Date().getFullYear();
@@ -394,6 +394,7 @@
         const closeAuthorDetailModalBtn = document.getElementById('close-author-detail-modal');
         const authorDetailTitle = document.getElementById('author-detail-title');
         const authorDetailList = document.getElementById('author-detail-list');
+        const authContainer = document.getElementById('auth-container');
 
         async function initializeFirebase() {
             try {
@@ -405,15 +406,9 @@
                 onAuthStateChanged(auth, async (user) => {
                     if (user) {
                         userId = user.uid;
-                        document.getElementById('user-id-display').textContent = userId;
-                        initializeAppUI();
+                        initializeAppUI(user);
                     } else {
-                        try {
-                            await signInAnonymously(auth);
-                        } catch (error) {
-                             console.error("Anonymous sign-in failed:", error);
-                             showError("Could not establish a secure session. Please refresh the page.");
-                        }
+                        initializeAppUI(null);
                     }
                 });
             } catch (error) {
@@ -422,8 +417,10 @@
             }
         }
 
-        function initializeAppUI() {
+        function initializeAppUI(user) {
+            renderAuthUI(user);
             if (!userId) return;
+            
             setupTabs();
             listenForAllBooks();
             addRowBtn.addEventListener('click', () => addBulkRow());
@@ -453,6 +450,35 @@
             viewToggleBtn.addEventListener('click', toggleView);
             closeGalleryDetailModalBtn.addEventListener('click', () => galleryDetailModal.style.display = 'none');
             closeAuthorDetailModalBtn.addEventListener('click', () => authorDetailModal.style.display = 'none');
+        }
+
+        function renderAuthUI(user) {
+            authContainer.innerHTML = '';
+            if (user) {
+                const userEl = document.createElement('div');
+                userEl.className = 'flex items-center space-x-2';
+                userEl.innerHTML = `
+                    <span class="text-sm text-gray-600">${user.isAnonymous ? 'Guest' : user.displayName || user.email}</span>
+                    <button id="sign-out-btn" class="px-3 py-1 text-xs font-medium rounded-md text-white bg-red-500 hover:bg-red-600">Sign Out</button>
+                `;
+                authContainer.appendChild(userEl);
+                document.getElementById('sign-out-btn').addEventListener('click', () => signOut(auth));
+            } else {
+                const signInBtn = document.createElement('button');
+                signInBtn.id = 'sign-in-btn';
+                signInBtn.className = 'px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700';
+                signInBtn.textContent = 'Sign in with Google';
+                signInBtn.addEventListener('click', async () => {
+                    const provider = new GoogleAuthProvider();
+                    try {
+                        await signInWithPopup(auth, provider);
+                    } catch (error) {
+                        console.error("Sign in failed:", error);
+                        showError("Could not sign in with Google. Please try again.");
+                    }
+                });
+                authContainer.appendChild(signInBtn);
+            }
         }
 
         function addBulkRow(book = { title: '', author: '', month: '', publicationYear: '', olid: '', isbn: '' }) {
