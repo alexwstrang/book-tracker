@@ -144,7 +144,7 @@
 
     <div class="container mx-auto p-4 sm:p-6 lg:p-8 max-w-7xl">
         <header class="text-center mb-6 relative">
-            <h1 class="text-3xl sm:text-4xl font-bold text-gray-900">AI Book Tracker v3.21</h1>
+            <h1 class="text-3xl sm:text-4xl font-bold text-gray-900">AI Book Tracker v3.22</h1>
             <p class="text-md text-gray-600 mt-2">Your personal reading history from 2014 to present.</p>
             <div id="auth-container" class="absolute top-0 right-0"></div>
         </header>
@@ -457,15 +457,6 @@
                 auth = getAuth(app);
                 setLogLevel('error'); 
 
-                // Handle redirect result from Google sign-in
-                getRedirectResult(auth)
-                    .catch((error) => {
-                        console.error("Redirect Result Error:", error);
-                        const errorCode = error.code;
-                        const errorMessage = error.message;
-                        showError(`Sign-in failed: ${errorMessage} (${errorCode})`);
-                    });
-
                 onAuthStateChanged(auth, async (user) => {
                     if (user) {
                         userId = user.uid;
@@ -561,15 +552,31 @@
             e.preventDefault();
             const email = document.getElementById('signup-email').value;
             const password = document.getElementById('signup-password').value;
-            
+            const currentUser = auth.currentUser;
+
+            if (!currentUser || !currentUser.isAnonymous) {
+                showError("An unexpected error occurred. Please refresh and try again.");
+                return;
+            }
+
             try {
-                // This creates the new user and signs them in, triggering onAuthStateChanged
-                await createUserWithEmailAndPassword(auth, email, password);
+                const credential = EmailAuthProvider.credential(email, password);
+                // Link the anonymous account with the new email/password credential
+                const userCredential = await linkWithCredential(currentUser, credential);
+                
+                // After linking, the anonymous user is now a permanent user.
+                // We can now safely remove the anonymous UID from local storage.
+                localStorage.removeItem('anonymousUid');
+                localAnonymousUid = null;
+
                 emailSignupModal.style.display = 'none';
                 e.target.reset();
-                // onAuthStateChanged will now handle the UI update and data migration
+
+                // Manually update the UI right away for a faster response.
+                renderAuthUI(userCredential.user);
+
             } catch (error) {
-                console.error("Sign up failed:", error);
+                console.error("Sign up and link failed:", error);
                 showError(`Could not create account: ${error.message}`);
             }
         }
