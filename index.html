@@ -144,7 +144,7 @@
 
     <div class="container mx-auto p-4 sm:p-6 lg:p-8 max-w-7xl">
         <header class="text-center mb-6 relative">
-            <h1 class="text-3xl sm:text-4xl font-bold text-gray-900">AI Book Tracker v3.17</h1>
+            <h1 class="text-3xl sm:text-4xl font-bold text-gray-900">AI Book Tracker v3.18</h1>
             <p class="text-md text-gray-600 mt-2">Your personal reading history from 2014 to present.</p>
             <div id="auth-container" class="absolute top-0 right-0"></div>
         </header>
@@ -327,7 +327,7 @@
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getAuth, onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signOut, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, onSnapshot, query, where, doc, deleteDoc, setLogLevel, orderBy, writeBatch, updateDoc, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         let currentYear = new Date().getFullYear();
@@ -337,6 +337,8 @@
         let allUserGenres = [];
         let allBooks = [];
         let currentEditingBookId = null;
+        let localAnonymousUid = localStorage.getItem('anonymousUid');
+
         
         const firebaseConfig = {
             apiKey: "AIzaSyCP1bHz8yFWHgFRrMKlmRY3BcC8JDVorR8",
@@ -406,8 +408,18 @@
                 onAuthStateChanged(auth, async (user) => {
                     if (user) {
                         userId = user.uid;
+                        if (!user.isAnonymous && localAnonymousUid && localAnonymousUid !== userId) {
+                            await migrateAnonymousData(localAnonymousUid, userId);
+                            localStorage.removeItem('anonymousUid');
+                            localAnonymousUid = null;
+                        }
+                        if (user.isAnonymous) {
+                            localStorage.setItem('anonymousUid', userId);
+                            localAnonymousUid = userId;
+                        }
                         initializeAppUI(user);
                     } else {
+                        signInAnonymously(auth).catch(err => console.error("Anonymous sign in failed on start", err));
                         initializeAppUI(null);
                     }
                 });
@@ -457,29 +469,59 @@
             if (user) {
                 const userEl = document.createElement('div');
                 userEl.className = 'flex items-center space-x-2';
-                userEl.innerHTML = `
-                    <span class="text-sm text-gray-600">${user.isAnonymous ? 'Guest' : user.displayName || user.email}</span>
-                    <button id="sign-out-btn" class="px-3 py-1 text-xs font-medium rounded-md text-white bg-red-500 hover:bg-red-600">Sign Out</button>
-                `;
-                authContainer.appendChild(userEl);
-                document.getElementById('sign-out-btn').addEventListener('click', () => signOut(auth));
+                if (user.isAnonymous) {
+                    userEl.innerHTML = `<button id="sign-in-btn" class="px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700">Sign in with Google</button>`;
+                    authContainer.appendChild(userEl);
+                    document.getElementById('sign-in-btn').addEventListener('click', signInWithGoogle);
+                } else {
+                    userEl.innerHTML = `
+                        <span class="text-sm text-gray-600">${user.displayName || user.email}</span>
+                        <button id="sign-out-btn" class="px-3 py-1 text-xs font-medium rounded-md text-white bg-red-500 hover:bg-red-600">Sign Out</button>
+                    `;
+                    authContainer.appendChild(userEl);
+                    document.getElementById('sign-out-btn').addEventListener('click', () => signOut(auth));
+                }
             } else {
-                const signInBtn = document.createElement('button');
+                 const signInBtn = document.createElement('button');
                 signInBtn.id = 'sign-in-btn';
                 signInBtn.className = 'px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700';
                 signInBtn.textContent = 'Sign in with Google';
-                signInBtn.addEventListener('click', async () => {
-                    const provider = new GoogleAuthProvider();
-                    try {
-                        await signInWithPopup(auth, provider);
-                    } catch (error) {
-                        console.error("Sign in failed:", error);
-                        showError("Could not sign in with Google. Please try again.");
-                    }
-                });
+                signInBtn.addEventListener('click', signInWithGoogle);
                 authContainer.appendChild(signInBtn);
             }
         }
+        
+        async function signInWithGoogle() {
+            const provider = new GoogleAuthProvider();
+            try {
+                await signInWithPopup(auth, provider);
+            } catch (error) {
+                console.error("Sign in failed:", error);
+                showError("Could not sign in with Google. Please try again.");
+            }
+        }
+        
+        async function migrateAnonymousData(anonUid, permanentUid) {
+            console.log(`Migrating data from ${anonUid} to ${permanentUid}`);
+            const anonBooksRef = collection(db, `users/${anonUid}/books`);
+            const snapshot = await getDocs(anonBooksRef);
+            if (snapshot.empty) {
+                console.log("No anonymous data to migrate.");
+                return;
+            }
+
+            const permanentBooksRef = collection(db, `users/${permanentUid}/books`);
+            const batch = writeBatch(db);
+            snapshot.docs.forEach(doc => {
+                const newDocRef = doc(permanentBooksRef, doc.id);
+                batch.set(newDocRef, doc.data());
+                batch.delete(doc.ref);
+            });
+
+            await batch.commit();
+            console.log("Successfully migrated anonymous user data.");
+        }
+
 
         function addBulkRow(book = { title: '', author: '', month: '', publicationYear: '', olid: '', isbn: '' }) {
             const rowId = `row-${Date.now()}`;
