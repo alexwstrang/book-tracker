@@ -144,7 +144,7 @@
 
     <div class="container mx-auto p-4 sm:p-6 lg:p-8 max-w-7xl">
         <header class="text-center mb-6 relative">
-            <h1 class="text-3xl sm:text-4xl font-bold text-gray-900">AI Book Tracker v3.18</h1>
+            <h1 class="text-3xl sm:text-4xl font-bold text-gray-900">AI Book Tracker v3.19</h1>
             <p class="text-md text-gray-600 mt-2">Your personal reading history from 2014 to present.</p>
             <div id="auth-container" class="absolute top-0 right-0"></div>
         </header>
@@ -178,9 +178,9 @@
                         <div class="md:col-span-1">
                              <label for="isbn-input" class="block text-sm font-medium text-gray-700">Add by ISBN</label>
                              <div class="flex items-center space-x-2 mt-1">
-                                <input type="text" id="isbn-input" placeholder="e.g., 9780345391803" class="block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
-                                <button type="button" id="find-by-isbn-btn" class="px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700">Find</button>
-                            </div>
+                                 <input type="text" id="isbn-input" placeholder="e.g., 9780345391803" class="block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                                 <button type="button" id="find-by-isbn-btn" class="px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700">Find</button>
+                             </div>
                         </div>
                         <div class="md:col-span-2 flex justify-end space-x-4">
                             <button type="button" id="add-row-btn" class="px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
@@ -244,46 +244,46 @@
              <button id="close-stats-modal" class="absolute top-4 right-4 text-gray-500 hover:text-gray-800 text-3xl font-bold">&times;</button>
              <h2 class="text-2xl font-bold mb-4">Reading Statistics</h2>
              <div class="mb-4">
-                <div class="inline-flex rounded-md shadow-sm">
-                    <button id="stats-year-btn" class="px-4 py-2 text-sm font-medium text-indigo-700 bg-white border border-gray-200 rounded-l-lg hover:bg-gray-100 focus:z-10 focus:ring-2 focus:ring-indigo-700">Stats for 2025</button>
-                    <button id="stats-all-btn" class="px-4 py-2 text-sm font-medium text-gray-900 bg-white border-t border-b border-gray-200 hover:bg-gray-100 focus:z-10 focus:ring-2 focus:ring-indigo-700">All Time</button>
-                </div>
+                 <div class="inline-flex rounded-md shadow-sm">
+                     <button id="stats-year-btn" class="px-4 py-2 text-sm font-medium text-indigo-700 bg-white border border-gray-200 rounded-l-lg hover:bg-gray-100 focus:z-10 focus:ring-2 focus:ring-indigo-700">Stats for 2025</button>
+                     <button id="stats-all-btn" class="px-4 py-2 text-sm font-medium text-gray-900 bg-white border-t border-b border-gray-200 hover:bg-gray-100 focus:z-10 focus:ring-2 focus:ring-indigo-700">All Time</button>
+                 </div>
              </div>
              <div id="stats-content">
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6 text-center">
-                    <div class="p-4 bg-gray-100 rounded-lg">
-                        <p class="text-sm text-gray-600">Total Books Read</p>
-                        <p id="stats-total-books" class="text-3xl font-bold"></p>
-                    </div>
-                    <div class="p-4 bg-gray-100 rounded-lg">
-                        <p class="text-sm text-gray-600">Unique Authors</p>
-                        <p id="stats-unique-authors" class="text-3xl font-bold"></p>
-                    </div>
+                 <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6 text-center">
                      <div class="p-4 bg-gray-100 rounded-lg">
-                        <p class="text-sm text-gray-600">Most Read Author</p>
-                        <p id="stats-top-author" class="text-xl font-bold truncate cursor-pointer hover:text-indigo-600"></p>
-                    </div>
-                </div>
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-                    <div>
-                        <h3 class="font-semibold mb-2">Fiction vs. Non-Fiction</h3>
-                        <canvas id="fiction-chart"></canvas>
-                    </div>
-                    <div>
-                        <h3 class="font-semibold mb-2">Top Genres</h3>
-                        <canvas id="genre-chart"></canvas>
-                    </div>
-                </div>
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div>
-                        <h3 class="font-semibold mb-2">Reading Heatmap by Month</h3>
-                        <div id="heatmap-container" class="heatmap-grid"></div>
-                    </div>
-                    <div>
-                        <h3 class="font-semibold mb-2">Books by Publication Decade</h3>
-                        <canvas id="decade-chart"></canvas>
-                    </div>
-                </div>
+                         <p class="text-sm text-gray-600">Total Books Read</p>
+                         <p id="stats-total-books" class="text-3xl font-bold"></p>
+                     </div>
+                     <div class="p-4 bg-gray-100 rounded-lg">
+                         <p class="text-sm text-gray-600">Unique Authors</p>
+                         <p id="stats-unique-authors" class="text-3xl font-bold"></p>
+                     </div>
+                      <div class="p-4 bg-gray-100 rounded-lg">
+                         <p class="text-sm text-gray-600">Most Read Author</p>
+                         <p id="stats-top-author" class="text-xl font-bold truncate cursor-pointer hover:text-indigo-600"></p>
+                     </div>
+                 </div>
+                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                     <div>
+                         <h3 class="font-semibold mb-2">Fiction vs. Non-Fiction</h3>
+                         <canvas id="fiction-chart"></canvas>
+                     </div>
+                     <div>
+                         <h3 class="font-semibold mb-2">Top Genres</h3>
+                         <canvas id="genre-chart"></canvas>
+                     </div>
+                 </div>
+                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                     <div>
+                         <h3 class="font-semibold mb-2">Reading Heatmap by Month</h3>
+                         <div id="heatmap-container" class="heatmap-grid"></div>
+                     </div>
+                     <div>
+                         <h3 class="font-semibold mb-2">Books by Publication Decade</h3>
+                         <canvas id="decade-chart"></canvas>
+                     </div>
+                 </div>
              </div>
         </div>
     </div>
@@ -342,7 +342,8 @@
         
         const firebaseConfig = {
             apiKey: "AIzaSyCP1bHz8yFWHgFRrMKlmRY3BcC8JDVorR8",
-            authDomain: "book-tracker-4987d.firebaseapp.com",
+            // Using your app's domain for authDomain is a best practice for custom-hosted sites.
+            authDomain: "alexwstrang.github.io",
             projectId: "book-tracker-4987d",
             storageBucket: "book-tracker-4987d.appspot.com",
             messagingSenderId: "236216243093",
@@ -483,11 +484,11 @@
                 }
             } else {
                  const signInBtn = document.createElement('button');
-                signInBtn.id = 'sign-in-btn';
-                signInBtn.className = 'px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700';
-                signInBtn.textContent = 'Sign in with Google';
-                signInBtn.addEventListener('click', signInWithGoogle);
-                authContainer.appendChild(signInBtn);
+                 signInBtn.id = 'sign-in-btn';
+                 signInBtn.className = 'px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700';
+                 signInBtn.textContent = 'Sign in with Google';
+                 signInBtn.addEventListener('click', signInWithGoogle);
+                 authContainer.appendChild(signInBtn);
             }
         }
         
@@ -972,10 +973,10 @@
                     suggestionsContainer.appendChild(div);
                 });
                  document.addEventListener('click', (e) => {
-                    if (!titleInput.parentElement.contains(e.target)) {
-                       suggestionsContainer.classList.add('hidden');
-                    }
-                }, { once: true });
+                     if (!titleInput.parentElement.contains(e.target)) {
+                         suggestionsContainer.classList.add('hidden');
+                     }
+                 }, { once: true });
             } else {
                 suggestionsContainer.classList.add('hidden');
             }
@@ -1362,3 +1363,8 @@
     </script>
 </body>
 </html>
+```
+
+I've updated the `authDomain` in your `firebaseConfig`. Please save these changes, wait a minute for your GitHub Pages site to update, and then test it one more time in a **fresh incognito window**.
+
+If this doesn't work, we may be looking at a truly unique issue with the project itself, and the next step would be to consider creating a new Firebase project to see if the issue can be replicated. I sincerely hope this change resolves 
